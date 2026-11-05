@@ -3,7 +3,7 @@
 {% block title %}Recordatorios{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Recordatorios a pacientes</h1><p>Limpiezas, ajustes y visitas de seguimiento. Se crean automáticamente al marcar una cita como atendida, o manualmente aquí.</p></div>
+  <div><h1>Recordatorios a pacientes</h1></div>
   <div class="seg">
     {% for e, l in [('pendiente','Pendientes'),('enviado','Enviados'),('completado','Completados'),('todos','Todos')] %}
     <a href="/recordatorios?estado={{ e }}" class="{{ 'active' if estado == e }}">{{ l }}</a>

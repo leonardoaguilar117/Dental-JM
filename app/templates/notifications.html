@@ -4,7 +4,6 @@
 <div class="page-head">
   <div>
     <h1>Centro de avisos</h1>
-    <p>Lo que necesitas atender. Los mensajes se envían <b>manualmente</b>: el botón abre WhatsApp con el texto listo y tú decides si lo mandas.</p>
   </div>
 </div>
 
@@ -37,7 +36,7 @@
         <span class="time-chip">{{ item.a.start|fecha('hora') }}</span>
         <div class="grow">
           <a class="title" href="/citas/{{ item.a.id }}" style="color:var(--ink)">{{ item.a.patient.full_name }}</a>
-          <div class="meta">{{ item.a.type }}{% if item.a.external %} · con {{ item.a.external.full_name }}{% endif %}</div>
+          <div class="meta">{{ item.a.type }}</div>
         </div>
         <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener">{{ icon('message') }} Enviar</a>
         <form method="post" action="/citas/{{ item.a.id }}/estado" class="inline-form">
@@ -73,10 +72,10 @@
     <div class="card-head"><h2>{{ icon('box') }} Depósito dental</h2><a class="btn btn-xs btn-ghost" href="/inventario">Abrir inventario</a></div>
     <ul class="list">
       {% for l in notif.inventory.expired %}
-      <li><span class="pill pill-bad">Caducado</span><div class="grow"><a class="title" href="/inventario/producto/{{ l.product_id }}" style="color:var(--ink)">{{ l.product.name }}</a><div class="meta">Lote {{ l.lot_code }} · {{ l.quantity|qty }} {{ l.product.unit }} · venció {{ l.expiry_date|rel }}</div></div></li>
+      <li><span class="pill pill-bad">Caducado</span><div class="grow"><a class="title" href="/inventario/producto/{{ l.product_id }}" style="color:var(--ink)">{{ l.product.name }}</a><div class="meta">{{ l.quantity|qty }} {{ l.product.unit }} · venció {{ l.expiry_date|rel }}</div></div></li>
       {% endfor %}
       {% for l in notif.inventory.expiring %}
-      <li><span class="pill pill-warn">Por caducar</span><div class="grow"><a class="title" href="/inventario/producto/{{ l.product_id }}" style="color:var(--ink)">{{ l.product.name }}</a><div class="meta">Lote {{ l.lot_code }} · {{ l.quantity|qty }} {{ l.product.unit }} · caduca {{ l.expiry_date|fecha }} ({{ l.expiry_date|rel }})</div></div></li>
+      <li><span class="pill pill-warn">Por caducar</span><div class="grow"><a class="title" href="/inventario/producto/{{ l.product_id }}" style="color:var(--ink)">{{ l.product.name }}</a><div class="meta">{{ l.quantity|qty }} {{ l.product.unit }} · caduca {{ l.expiry_date|fecha }} ({{ l.expiry_date|rel }})</div></div></li>
       {% endfor %}
       {% for p in notif.inventory.low %}
       <li><span class="pill pill-info">Stock bajo</span><div class="grow"><a class="title" href="/inventario/producto/{{ p.id }}" style="color:var(--ink)">{{ p.name }}</a><div class="meta">Existencia {{ p.stock }} · mínimo {{ p.min_stock|round(0)|int }} {{ p.unit }}</div></div></li>
