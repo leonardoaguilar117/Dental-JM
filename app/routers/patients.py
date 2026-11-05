@@ -6,21 +6,24 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import get_db
-from ..models import ClinicalNote, ExternalSpecialist, MedicalHistory, Patient, User
-from ..utils import now_local, parse_date, parse_datetime
+from ..models import ClinicalNote, MedicalHistory, Patient, Payment, User
+from ..utils import now_local, parse_date, parse_datetime, whatsapp_link
 from ..web import current_user, flash, redirect, render
 from ..services import notifications, gcal
 
 router = APIRouter(prefix="/pacientes")
 
 PATIENT_FIELDS = ["first_name", "last_name", "sex", "phone", "email", "address", "occupation",
-                  "emergency_contact", "referred_by", "notes"]
+                  "emergency_contact", "notes"]
 HISTORY_TEXT = ["motivo_consulta", "padecimiento_actual", "antecedentes_heredofamiliares",
                 "antecedentes_patologicos", "antecedentes_no_patologicos", "alergias", "medicamentos",
                 "presion_arterial", "exploracion_extraoral", "exploracion_intraoral", "higiene_oral",
-                "oclusion", "diagnostico", "plan_tratamiento", "pronostico"]
+                "oclusion", "diagnostico", "plan_tratamiento", "pronostico", "lengua_notas", "encia_notas"]
 HISTORY_BOOL = ["diabetes", "hipertension", "cardiopatia", "coagulacion", "embarazo", "fumador",
-                "bruxismo", "consentimiento_firmado", "aviso_privacidad"]
+                "bruxismo", "aviso_privacidad"]  # consentimiento_firmado lo marca la firma en pantalla
+
+SIGNATURE_PREFIX = "data:image/png;base64,"
+SIGNATURE_MAX = 400_000  # ~300 KB de imagen; una firma normal pesa 10-40 KB
 
 
 def _get_patient(db: Session, pid: int) -> Patient:
@@ -42,7 +45,7 @@ def list_patients(request: Request, q: str = "", doctor: str = "", saldo: str = 
         stmt = stmt.where(Patient.primary_doctor_id == int(doctor))
     patients = db.scalars(stmt).all()
     if saldo:
-        patients = [p for p in patients if p.balance > 0]
+        patients = [p for p in patients if p.balance_for(user.id) > 0]
     doctors = db.scalars(select(User).order_by(User.id)).all()
     return render(request, "patients/list.html", db, user, patients=patients, q=q, doctor=doctor,
                   saldo=saldo, doctors=doctors)
@@ -79,10 +82,14 @@ def patient_detail(pid: int, request: Request, db: Session = Depends(get_db), us
         db.commit()
         db.refresh(p)
     doctors = db.scalars(select(User).order_by(User.id)).all()
-    externals = db.scalars(select(ExternalSpecialist).where(ExternalSpecialist.active)).all()
     reminder_links = {r.id: notifications.reminder_message(r) for r in p.reminders}
+    rid = request.query_params.get("recibo", "")
+    last_pay = db.get(Payment, int(rid)) if rid.isdigit() else None
+    if last_pay and last_pay.patient_id != p.id:
+        last_pay = None
+    paid_wa = whatsapp_link(p.phone, notifications.payment_message(last_pay)) if last_pay and p.phone else ""
     return render(request, "patients/detail.html", db, user, p=p, h=p.history, doctors=doctors,
-                  externals=externals, tooth_states=config.TOOTH_STATES, reminder_links=reminder_links,
+                  last_pay=last_pay, paid_wa=paid_wa, tooth_states=config.TOOTH_STATES, reminder_links=reminder_links,
                   tooth_states_json=json.dumps({k: list(v) for k, v in config.TOOTH_STATES.items()}, ensure_ascii=False),
                   gcal_link=gcal.add_link)
 
@@ -126,6 +133,8 @@ async def save_history(pid: int, request: Request, db: Session = Depends(get_db)
         setattr(h, k, str(f.get(k, "")).strip())
     for k in HISTORY_BOOL:
         setattr(h, k, f.get(k) == "on")
+    h.lengua_hallazgos = json.dumps([x for x in f.getlist("lengua") if x in config.LENGUA_OPCIONES], ensure_ascii=False)
+    h.encia_hallazgos = json.dumps([x for x in f.getlist("encia") if x in config.ENCIA_OPCIONES], ensure_ascii=False)
     odo = str(f.get("odontograma_json") or "{}")
     try:
         json.loads(odo)
@@ -137,6 +146,43 @@ async def save_history(pid: int, request: Request, db: Session = Depends(get_db)
     db.add(h)
     db.commit()
     flash(request, "Historia clínica guardada.")
+    return redirect(f"/pacientes/{pid}#historia")
+
+
+@router.post("/{pid}/consentimiento")
+async def sign_consent(pid: int, request: Request, db: Session = Depends(get_db),
+                       user: User = Depends(current_user)):
+    p = _get_patient(db, pid)
+    f = await request.form()
+    firma = str(f.get("firma") or "")
+    nombre = str(f.get("nombre") or "").strip() or p.full_name
+    if not firma.startswith(SIGNATURE_PREFIX) or len(firma) > SIGNATURE_MAX:
+        flash(request, "No se recibió la firma. Pide al paciente que firme en el recuadro.", "error")
+        return redirect(f"/pacientes/{pid}#historia")
+    h = p.history or MedicalHistory(patient_id=p.id)
+    h.consentimiento_firma = firma
+    h.consentimiento_nombre = nombre[:160]
+    h.consentimiento_fecha = now_local()
+    h.consentimiento_firmado = True
+    h.updated_by_id = user.id
+    db.add(h)
+    db.commit()
+    flash(request, f"Consentimiento informado firmado por {h.consentimiento_nombre}.")
+    return redirect(f"/pacientes/{pid}#historia")
+
+
+@router.post("/{pid}/consentimiento/eliminar")
+def clear_consent(pid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    p = _get_patient(db, pid)
+    h = p.history
+    if h:
+        h.consentimiento_firma = ""
+        h.consentimiento_nombre = ""
+        h.consentimiento_fecha = None
+        h.consentimiento_firmado = False
+        h.updated_by_id = user.id
+        db.commit()
+    flash(request, "Firma eliminada. El paciente puede firmar de nuevo.")
     return redirect(f"/pacientes/{pid}#historia")
 
 
