@@ -58,11 +58,11 @@ def pop_flash(request: Request) -> list[dict]:
 
 
 THEMES = {
-    "lima": {"name": "Lima", "swatches": ["#e2f8af", "#0ea1d2", "#418d96", "#1c2030"]},
     "arrecife": {"name": "Arrecife", "swatches": ["#1c4a6d", "#07a2c8", "#6cf7a0", "#a95482"]},
     "lavanda": {"name": "Lavanda", "swatches": ["#c0cde6", "#012880", "#85b559", "#a393be"]},
-    "grafito": {"name": "Grafito", "swatches": ["#16181d", "#a393be", "#85b559", "#c0cde6"]},
+    "grafito": {"name": "Grafito", "swatches": ["#e4e6ea", "#2b2e35", "#a393be", "#85b559"]},
 }
+DEFAULT_THEME = "lavanda"
 templates.env.globals["THEMES"] = THEMES
 
 
@@ -93,13 +93,13 @@ def _nav_counts(db: Session, user: User) -> dict:
 
 
 def render(request: Request, template: str, db: Session, user: User | None, **ctx):
-    theme = request.cookies.get("jm_theme", "lima")
+    theme = request.cookies.get("jm_theme", DEFAULT_THEME)
     ctx.update(
         user=user,
         flashes=pop_flash(request),
         notif_count=notifications.count_only(db, user) if user else 0,
         nav=_nav_counts(db, user) if user else {},
-        theme=theme if theme in THEMES else "lima",
+        theme=theme if theme in THEMES else DEFAULT_THEME,  # p.ej. quien tenía el tema Lima
         path=request.url.path,
     )
     return templates.TemplateResponse(request, template, ctx)
