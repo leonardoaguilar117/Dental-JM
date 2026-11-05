@@ -2,7 +2,7 @@
 {% block title %}Nueva cita{% endblock %}
 {% block content %}
 {% set pf = prefill or {} %}
-<div class="page-head"><div><h1>Agendar cita</h1><p>El sistema valida que ni el doctor ni el especialista externo tengan otra cita a la misma hora.</p></div></div>
+<div class="page-head"><div><h1>Agendar cita</h1></div></div>
 <form method="post" action="/citas/nueva" class="card card-pad" style="max-width:820px">
   <div class="form-grid">
     <div class="field span-2"><label>Paciente *</label>
@@ -19,14 +19,6 @@
     <div class="field"><label>Fecha y hora de inicio *</label><input type="datetime-local" name="start" required value="{{ start.strftime('%Y-%m-%dT%H:%M') }}" step="900"></div>
     <div class="field"><label>Duración</label>
       <select name="duration" id="duration">{% for m in [15, 30, 45, 60, 90, 120, 180] %}<option value="{{ m }}" {{ 'selected' if (pf.duration|default('60')) == m|string }}>{{ m }} min</option>{% endfor %}</select></div>
-    <div class="field span-2">
-      <label>Especialista externo (sin usuario)</label>
-      <select name="external_id" id="external_id">
-        <option value="">No requiere</option>
-        {% for e in externals %}<option value="{{ e.id }}" {{ 'selected' if pf.external_id == e.id|string }}>{{ e.full_name }} · {{ e.specialty }}</option>{% endfor %}
-      </select>
-      {% for e in externals %}{% if e.availability_note %}<div class="hint">{{ icon('clock') }} {{ e.full_name }}: {{ e.availability_note }}</div>{% endif %}{% endfor %}
-    </div>
     <div class="field span-2"><label>Notas</label><textarea name="notes" placeholder="Indicaciones, material a preparar, estudios que debe traer…">{{ pf.notes }}</textarea></div>
   </div>
   {% if prefill %}<label class="check mb" style="color:var(--bad)"><input type="checkbox" name="force" value="1"> Agendar de todos modos (ignorar conflicto)</label>{% endif %}
@@ -35,10 +27,10 @@
 {% endblock %}
 {% block scripts %}
 <script>
-// Sugerencias: cirugía => 120 min y maxilofacial preseleccionado
+// Duración sugerida según el tipo de cita
 document.getElementById("type").addEventListener("change", (e) => {
-  const v = e.target.value, dur = document.getElementById("duration"), ext = document.getElementById("external_id");
-  if (v === "Extracción / cirugía") { dur.value = "120"; if (ext.options.length > 1 && !ext.value) ext.selectedIndex = 1; }
+  const v = e.target.value, dur = document.getElementById("duration");
+  if (v === "Extracción / cirugía") dur.value = "120";
   else if (v === "Ajuste de ortodoncia" || v === "Valoración") dur.value = "30";
   else if (v === "Colocación de brackets / alineadores" || v === "Carillas / coronas" || v === "Diseño de sonrisa") dur.value = "90";
   else dur.value = "60";
