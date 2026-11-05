@@ -25,10 +25,10 @@ def _parse_month(value: str | None) -> tuple[int, int]:
 
 
 @router.get("/")
-def dashboard(request: Request, mes: str | None = None, vista: str = "mia",
+def dashboard(request: Request, mes: str | None = None,
               db: Session = Depends(get_db), user: User = Depends(current_user)):
     year, month = _parse_month(mes)
-    scope = None if vista == "consultorio" else user
+    scope = user  # cada doctor ve solo sus números
     summary = finance.month_summary(db, scope, year, month)
     chart = finance.series(db, scope, year, month, 6)
     receivable_total, receivable_items = finance.receivables(db, scope)
@@ -66,9 +66,9 @@ def dashboard(request: Request, mes: str | None = None, vista: str = "mia",
         summary=summary, chart=chart, receivable_total=receivable_total,
         receivable_items=receivable_items[:6], today_appts=today_appts, upcoming_count=upcoming_count,
         active_treatments=active_treatments[:8], patients_count=patients_count, notif=notif, inv=inv,
-        year=year, month=month, month_name=MESES[month - 1], vista=vista,
+        year=year, month=month, month_name=MESES[month - 1], vista="mia",
         prev_mes=f"{py}-{pm:02d}", next_mes=f"{ny}-{nm:02d}",
-        settlement=finance.shared_settlement(db, year, month) if vista == "consultorio" else None,
+        settlement=None,
         day=day, finding=finding,
         max_cat=max(summary["egresos"]["por_categoria"].values(), default=0),
     )
@@ -78,7 +78,7 @@ DAY_START, DAY_END = 8 * 60, 20 * 60  # la jornada del consultorio: 08:00-20:00
 
 
 def _day_strip(db: Session, user: User, t0: datetime) -> dict:
-    """Carriles del día: cada doctor y el maxilofacial, con sus citas posicionadas en % de la jornada."""
+    """Carriles del día: uno por doctor, con sus citas posicionadas en % de la jornada."""
     appts = db.scalars(select(Appointment).where(Appointment.start >= t0, Appointment.start < t0 + timedelta(days=1))
                        .order_by(Appointment.start)).all()
     span = DAY_END - DAY_START
@@ -92,10 +92,6 @@ def _day_strip(db: Session, user: User, t0: datetime) -> dict:
     doctors.sort(key=lambda d: d.id != user.id)  # mi carril primero
     lanes = [{"name": d.full_name, "short": d.short_name, "color": d.color,
               "slots": [place(a) for a in appts if a.doctor_id == d.id]} for d in doctors]
-    from ..models import ExternalSpecialist
-    for ext in db.scalars(select(ExternalSpecialist).where(ExternalSpecialist.active)).all():
-        lanes.append({"name": ext.full_name, "short": ext.full_name, "color": ext.color, "external": True,
-                      "slots": [place(a) for a in appts if a.external_id == ext.id]})
     from ..utils import now_local
     now = now_local()
     minutes = now.hour * 60 + now.minute
