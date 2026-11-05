@@ -2,7 +2,7 @@
 {% from "_icons.html" import icon, avatar, theme_picker %}
 {% block title %}Iniciar sesión{% endblock %}
 {% block public %}
-<div class="login-theme">{{ theme_picker(theme|default('lima')) }}</div>
+<div class="login-theme">{{ theme_picker(theme|default('lavanda')) }}</div>
 <div class="login-wrap">
   <section class="login-art">
     <div class="login-brand">
@@ -11,33 +11,18 @@
     </div>
     <div>
       <h1>Cada sonrisa, con su historia completa.</h1>
-      <p>Expedientes con odontograma, agenda compartida con el maxilofacial, cobros y saldos, gastos del consultorio y el depósito dental en un solo lugar.</p>
-    </div>
-    <div>
-      <div class="scene" data-typodont data-view="abierta"
-           data-odonto='{"16":"obturado","26":"obturado","36":"caries","46":"endodoncia","11":"corona","38":"ausente","48":"extraer","13":"bracket","12":"bracket","22":"bracket","23":"bracket","33":"bracket","32":"bracket","31":"bracket","41":"bracket","42":"bracket","43":"bracket"}'
-           data-states='{{ tooth_states_json }}' aria-label="Tipodonto 3D de demostración">
-        <div class="scene-skeleton"></div>
-      </div>
-      <div class="arch-legend art-extra">
-        <span><span class="swatch" style="background:#418d96"></span>Bracket</span>
-        <span><span class="swatch" style="background:#0ea1d2"></span>Resina</span>
-        <span><span class="swatch" style="background:#c4242a"></span>Caries</span>
-        <span><span class="swatch" style="background:#6c4813"></span>Endodoncia</span>
-        <span><span class="swatch" style="background:#e2f8af;box-shadow:inset 0 0 0 1px #1c2030"></span>Corona</span>
-      </div>
     </div>
     <small class="art-extra">Demo ilustrativo · datos ficticios</small>
   </section>
   <section class="login-form">
     <div class="login-card">
       <h2 style="font-size:22px;line-height:28px;margin-bottom:4px">Entrar</h2>
-      <p class="muted" style="margin-bottom:20px">Elige tu usuario y escribe tu contraseña.</p>
+      <div style="margin-bottom:16px"></div>
       <form method="post" action="/login">
         <div class="doctor-pick" role="radiogroup" aria-label="Usuario">
           {% for d in doctors %}
           <button type="button" role="radio" aria-checked="{{ 'true' if loop.first else 'false' }}" data-user="{{ d.username }}" class="{{ 'active' if loop.first }}">
-            {{ avatar(d.initials, d.color) }}
+            {{ avatar(d.initials, d.color, '', d.photo) }}
             <div><b>{{ d.full_name }}</b><span>{{ d.specialty }}{% if d.can_inventory %} · Depósito dental{% endif %}</span></div>
             <span class="tick">{{ icon('check') }}</span>
           </button>
@@ -56,7 +41,6 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script type="module" src="/static/js/typodont3d.js?v=3"></script>
 <script>
 document.querySelectorAll(".doctor-pick button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".doctor-pick button").forEach(x => { const on = x === b; x.classList.toggle("active", on); x.setAttribute("aria-checked", on); });
