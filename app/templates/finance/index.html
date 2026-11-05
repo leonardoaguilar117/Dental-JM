@@ -2,15 +2,11 @@
 {% from "_icons.html" import status_pill %}
 {% block title %}Finanzas{% endblock %}
 {% block content %}
-{% set qs = 'vista=' ~ vista ~ '&mes=' ~ mes %}
+{% set qs = 'mes=' ~ mes %}
 <div class="page-head">
-  <div><h1>Finanzas</h1><p>{{ 'Consultorio completo' if vista == 'consultorio' else 'Tus cobros y gastos (incluye tu parte de los compartidos)' }} · {{ month_name }} {{ year }}</p></div>
+  <div><h1>Finanzas</h1><p>{{ month_name|capitalize }} {{ year }}</p></div>
   <div class="actions">
-    <div class="seg">
-      <a href="/finanzas?vista=mia&mes={{ mes }}&tab={{ tab }}" class="{{ 'active' if vista != 'consultorio' }}">Mis números</a>
-      <a href="/finanzas?vista=consultorio&mes={{ mes }}&tab={{ tab }}" class="{{ 'active' if vista == 'consultorio' }}">Consultorio</a>
-    </div>
-    <form method="get" class="row" style="gap:6px"><input type="hidden" name="vista" value="{{ vista }}"><input type="hidden" name="tab" value="{{ tab }}">
+    <form method="get" class="row" style="gap:6px"><input type="hidden" name="tab" value="{{ tab }}">
       <input type="month" name="mes" value="{{ mes }}" onchange="this.form.submit()" style="width:auto" class="btn"></form>
   </div>
 </div>
@@ -21,6 +17,7 @@
   <div class="card kpi"><div class="label">Utilidad</div><div class="value" style="color:{{ 'var(--ok)' if summary.utilidad >= 0 else 'var(--bad)' }}">{{ summary.utilidad|money0 }}</div><div class="sub">Del mes seleccionado</div></div>
   <div class="card kpi"><div class="label">Por cobrar</div><div class="value">{{ rec_total|money0 }}</div><div class="sub">{{ rec_items|length }} tratamiento(s) con saldo</div></div>
 </div>
+
 
 <div class="tabs">
   <a href="#cobros" data-tab="cobros">Cobros del mes ({{ payments|length }})</a>
@@ -33,17 +30,33 @@
     <div class="card-head"><h2>Abonos recibidos</h2><a class="btn btn-sm" href="/finanzas/exportar/pagos.csv?{{ qs }}">{{ icon('download') }} Exportar CSV</a></div>
     {% if payments %}
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Fecha</th><th>Paciente</th><th>Tratamiento</th>{% if vista == 'consultorio' %}<th>Doctor</th>{% endif %}<th>Método</th><th class="num">Monto</th><th></th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Paciente</th><th>Tratamiento</th><th>Método</th><th class="num">Abono</th><th class="num">Debe hoy</th><th></th></tr></thead>
       <tbody>{% for p in payments %}
         <tr><td>{{ p.date|fecha }}</td><td><a class="rowlink" href="/pacientes/{{ p.patient_id }}#tratamientos">{{ p.patient.full_name }}</a></td><td>{{ p.treatment.name }}</td>
-          {% if vista == 'consultorio' %}<td><span class="row" style="gap:6px"><span class="swatch" style="background:{{ p.doctor.color }}"></span>{{ p.doctor.short_name }}</span></td>{% endif %}
-          <td>{{ p.method }}</td><td class="num"><b>{{ p.amount|money }}</b></td><td class="num"><a class="btn btn-xs" href="/pagos/{{ p.id }}/recibo" target="_blank">{{ icon('receipt') }}</a></td></tr>
+          <td>{{ p.method }}</td><td class="num"><b>{{ p.amount|money }}</b></td>
+          <td class="num">{% if p.treatment.balance > 0 %}<span style="color:var(--bad)">{{ p.treatment.balance|money }}</span>{% else %}<span class="pill pill-ok">Liquidado</span>{% endif %}</td><td class="num"><a class="btn btn-xs" href="/pagos/{{ p.id }}/recibo" target="_blank">{{ icon('receipt') }}</a></td></tr>
       {% endfor %}</tbody>
-      <tfoot><tr><td colspan="{{ 5 if vista == 'consultorio' else 4 }}" class="num"><b>Total</b></td><td class="num"><b>{{ payments|sum(attribute='amount')|money }}</b></td><td></td></tr></tfoot>
+      <tfoot><tr><td colspan="4" class="num"><b>Total</b></td><td class="num"><b>{{ payments|sum(attribute='amount')|money }}</b></td><td></td><td></td></tr></tfoot>
     </table></div>
     {% else %}<div class="empty">No hay abonos en este mes.</div>{% endif %}
   </div>
-  <p class="muted mt">Para registrar un abono abre el expediente del paciente → pestaña <b>Tratamientos y pagos</b>.</p>
+  {% if user.can_inventory %}
+  <div class="card mt">
+    <div class="card-head"><h2>Ventas del depósito</h2>
+      <div class="actions"><a class="btn btn-sm" href="/inventario/ventas?mes={{ mes }}">Ver detalle</a><a class="btn btn-sm btn-primary" href="/inventario/venta">{{ icon('plus') }} Registrar venta</a></div></div>
+    {% if sales %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Fecha</th><th>Folio</th><th>Cliente</th><th>Productos</th><th>Pago</th><th class="num">Total</th></tr></thead>
+      <tbody>{% for tk in sales %}
+        <tr><td>{{ tk.date|fecha }}</td><td class="tnum">{% if tk.ticket %}<a href="/inventario/ventas/{{ tk.ticket }}">{{ tk.code }}</a>{% else %}{{ tk.code }}{% endif %}</td><td>{{ tk.customer }}</td>
+          <td>{% for m in tk.lines %}{{ m.product.name }} <span class="muted">×{{ (-m.quantity)|qty }}</span>{{ ', ' if not loop.last }}{% endfor %}</td>
+          <td>{{ tk.method or '—' }}</td><td class="num"><b>{{ tk.total|money }}</b></td></tr>
+      {% endfor %}</tbody>
+      <tfoot><tr><td colspan="5" class="num"><b>Total</b></td><td class="num"><b>{{ sales|sum(attribute='total')|money }}</b></td></tr></tfoot>
+    </table></div>
+    {% else %}<div class="empty">Sin ventas del depósito en este mes.</div>{% endif %}
+  </div>
+  {% endif %}
 </section>
 
 <section class="tab-panel" id="tab-cobrar">
@@ -53,11 +66,11 @@
     <div class="table-wrap"><table class="table">
       <thead><tr><th>Paciente</th><th>Tratamiento</th><th>Estado</th><th>Pagado</th><th class="num">Total</th><th class="num">Saldo</th><th></th></tr></thead>
       <tbody>{% for t in rec_items %}
-        <tr><td><a class="rowlink" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a>{% if vista == 'consultorio' %}<div class="muted" style="font-size:12px">{{ t.doctor.short_name }}</div>{% endif %}</td>
+        <tr><td><a class="rowlink" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a></td>
           <td>{{ t.name }}</td><td>{{ status_pill(t.status) }}</td>
           <td style="min-width:120px"><div class="row"><div class="progress blue" style="flex:1"><span style="width:{{ t.paid_pct }}%"></span></div><small class="tnum">{{ t.paid_pct }}%</small></div></td>
           <td class="num">{{ t.net_total|money0 }}</td><td class="num"><b>{{ t.balance|money }}</b></td>
-          <td class="num">{% if t.patient.phone %}<a class="btn btn-xs btn-wa" href="{{ debt_links[t.id] }}" target="_blank" rel="noopener" title="Recordar saldo">{{ icon('message') }} Recordar</a>{% endif %}</td></tr>
+          <td class="num row-actions"><a class="btn btn-xs btn-primary" href="/pacientes/{{ t.patient_id }}?cobrar={{ t.id }}">{{ icon('wallet') }} Cobrar</a>{% if t.patient.phone %}<a class="btn btn-xs btn-wa" href="{{ debt_links[t.id] }}" target="_blank" rel="noopener" title="Recordar saldo">{{ icon('message') }} Recordar</a>{% endif %}</td></tr>
       {% endfor %}</tbody>
     </table></div>
     {% else %}<div class="empty">Sin saldos pendientes.</div>{% endif %}
@@ -76,14 +89,14 @@
         </div>
         {% if expenses %}
         <div class="table-wrap"><table class="table">
-          <thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Tipo</th><th class="num">Monto</th>{% if vista != 'consultorio' %}<th class="num">Mi parte</th>{% endif %}<th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Tipo</th><th class="num">Monto</th><th class="num">Mi parte</th><th></th></tr></thead>
           <tbody>{% for e in expenses %}
             <tr><td>{{ e.date|fecha }}</td><td><b>{{ e.concept }}</b>{% if e.recurring %} <span class="pill">recurrente</span>{% endif %}<div class="muted" style="font-size:12px">Pagó: {{ e.owner.short_name if e.owner else '—' }} · {{ e.method }}</div></td>
               <td>{{ e.category }}</td>
               <td>{% if e.is_shared %}<span class="pill pill-violet">Compartido</span>{% else %}<span class="pill">Propio</span>{% endif %}</td>
               <td class="num">{{ e.amount|money }}</td>
-              {% if vista != 'consultorio' %}<td class="num"><b>{{ (e.amount * user.shared_expense_pct / 100 if e.is_shared else e.amount)|money }}</b></td>{% endif %}
-              <td class="num"><form method="post" action="/gastos/{{ e.id }}/eliminar" class="inline-form" data-confirm="¿Eliminar el gasto «{{ e.concept }}»?"><button class="btn btn-xs btn-ghost btn-danger">{{ icon('x') }}</button></form></td></tr>
+              <td class="num"><b>{{ (e.amount * user.shared_expense_pct / 100 if e.is_shared else e.amount)|money }}</b></td>
+              <td class="num">{% if user.id in (e.owner_id, e.created_by_id) %}<form method="post" action="/gastos/{{ e.id }}/eliminar" class="inline-form" data-confirm="¿Eliminar el gasto «{{ e.concept }}»?"><button class="btn btn-xs btn-ghost btn-danger">{{ icon('x') }}</button></form>{% endif %}</td></tr>
           {% endfor %}</tbody>
         </table></div>
         {% else %}<div class="empty">Sin gastos registrados en este mes.</div>{% endif %}
@@ -95,7 +108,6 @@
           <tbody>{% for s in settlement %}<tr><td>{{ s.user.full_name }} <small class="muted">({{ s.user.shared_expense_pct|int }}%)</small></td><td class="num">{{ s.pagado|money }}</td><td class="num">{{ s.corresponde|money }}</td>
             <td class="num" style="color:{{ 'var(--ok)' if s.diferencia >= 0 else 'var(--bad)' }}">{{ '+' if s.diferencia >= 0 }}{{ s.diferencia|money }}</td></tr>{% endfor %}</tbody>
         </table></div>
-        <div class="card-body"><small class="muted">Si la diferencia es positiva, ese doctor pagó de más y el otro le debe esa cantidad. El porcentaje se ajusta en Configuración.</small></div>
       </div>
     </div>
 
@@ -112,9 +124,8 @@
           <label class="check" style="flex:1;padding:6px 10px"><input type="radio" name="scope" value="propio" checked> Solo mío</label>
           <label class="check" style="flex:1;padding:6px 10px"><input type="radio" name="scope" value="compartido"> Compartido</label>
         </div>
-        <div class="hint">Compartido = luz, agua, internet, renta… se reparte {% for d in doctors %}{{ d.shared_expense_pct|int }}%{{ ' / ' if not loop.last }}{% endfor %}.</div>
       </div>
-      <div class="field"><label>Pagado por</label><select name="paid_by">{% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if d.id == user.id }}>{{ d.full_name }}</option>{% endfor %}</select></div>
+      <div class="field" id="paid-by" hidden><label>Pagado por</label><select name="paid_by">{% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if d.id == user.id }}>{{ d.full_name }}</option>{% endfor %}</select></div>
       <div class="field"><label>Método de pago</label><select name="method">{% for m in methods %}<option>{{ m }}</option>{% endfor %}</select></div>
       <label class="check mb"><input type="checkbox" name="recurring"> Gasto recurrente (se repite cada mes)</label>
       <div class="field"><label>Notas</label><input type="text" name="notes"></div>
@@ -125,6 +136,10 @@
 {% endblock %}
 {% block scripts %}
 <script>
+// "Pagado por" solo aplica a gastos compartidos; uno propio siempre es de quien lo registra
+document.querySelectorAll('input[name="scope"]').forEach(r => r.addEventListener("change", () => {
+  document.getElementById("paid-by").hidden = document.querySelector('input[name="scope"]:checked').value !== "compartido";
+}));
 // Abre la pestaña indicada por ?tab= si no hay hash
 if (!location.hash) { const t = "{{ tab }}"; const el = document.querySelector(`[data-tab="${t}"]`); if (el) el.click(); }
 </script>

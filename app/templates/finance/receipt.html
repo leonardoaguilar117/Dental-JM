@@ -12,9 +12,14 @@
     <dt>Cantidad</dt><dd><b style="font-size:18px">{{ pay.amount|money }}</b></dd>
     <dt>Concepto</dt><dd>Abono a «{{ pay.treatment.name }}»</dd>
     <dt>Método</dt><dd>{{ pay.method }}{% if pay.reference %} · Ref. {{ pay.reference }}{% endif %}</dd>
-    <dt>Atendió</dt><dd>{{ pay.doctor.full_name }}</dd>
-    <dt>Saldo restante</dt><dd>{{ pay.treatment.balance|money }}</dd>
+    <dt>Cobró</dt><dd>{{ pay.doctor.full_name }}</dd>
+    {% set t = pay.treatment %}{% set after = t.balance_after(pay) %}
+    <dt>Total del tratamiento</dt><dd>{{ t.net_total|money }}</dd>
+    <dt>Pagado con este abono</dt><dd>{{ (t.net_total - after)|money }}</dd>
   </dl>
+  <div class="receipt-status {{ 'owe' if after > 0 else 'ok' }}">
+    {% if after > 0 %}Queda a deber <b>{{ after|money }}</b>{% else %}<b>Tratamiento liquidado</b> · no queda saldo pendiente{% endif %}
+  </div>
   <div class="signature"><div>{{ pay.doctor.full_name }}</div></div>
 </div>
 {% endblock %}
