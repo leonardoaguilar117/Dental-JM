@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% from "_icons.html" import status_pill %}
+{% block title %}{{ p.full_name }}{% endblock %}
+{% block content %}
+<div class="card mb">
+  <div class="p-head">
+    <span style="display:inline-block;view-transition-name: pav-{{ p.id }}">{{ avatar(p.initials, p.primary_doctor.color if p.primary_doctor else '#64748b', 'avatar-lg') }}</span>
+    <div class="grow">
+      <div class="row wrap" style="gap:8px"><h1 style="view-transition-name: pname-{{ p.id }}">{{ p.full_name }}</h1>
+        {% for f in h.alert_flags %}<span class="pill pill-bad">{{ icon('alert') }} {{ f }}</span>{% endfor %}
+        {% if not h.consentimiento_firmado %}<span class="pill pill-warn">Falta consentimiento informado</span>{% endif %}
+      </div>
+      <div class="p-facts">
+        <span><b>{{ p.age if p.age is not none else '—' }}</b> años</span>
+        <span>{{ p.sex or 'Sexo no indicado' }}</span>
+        <span>{{ icon('message') }} {{ p.phone or 'Sin teléfono' }}</span>
+        <span>Expediente <b>#{{ '%05d'|format(p.id) }}</b></span>
+        <span>Tratante: <b>{{ p.primary_doctor.short_name if p.primary_doctor else '—' }}</b></span>
+      </div>
+    </div>
+    <div class="money-strip">
+      {% set tot = p.treatments|rejectattr('status','equalto','cancelado')|sum(attribute='net_total') %}
+      <div><small class="muted">Presupuestado</small><b>{{ tot|money0 }}</b></div>
+      <div><small class="muted">Pagado</small><b style="color:var(--ok)">{{ (tot - p.balance)|money0 }}</b></div>
+      <div><small class="muted">Saldo</small><b style="color:{{ 'var(--bad)' if p.balance > 0 else 'var(--ink)' }}">{{ p.balance|money0 }}</b></div>
+    </div>
+  </div>
+  <div class="card-body row wrap" style="border-top:1px solid var(--line);gap:8px">
+    <a class="btn btn-sm btn-primary" href="/citas/nueva?paciente={{ p.id }}">{{ icon('calendar') }} Agendar cita</a>
+    {% if p.phone %}<a class="btn btn-sm btn-wa" href="{{ wa(p.phone, 'Hola ' ~ p.first_name ~ ', te saludamos del Consultorio Dental JM.') }}" target="_blank" rel="noopener">{{ icon('message') }} WhatsApp</a>{% endif %}
+    <a class="btn btn-sm" href="/pacientes/{{ p.id }}/historia/imprimir" target="_blank">{{ icon('printer') }} Imprimir historia clínica</a>
+    <a class="btn btn-sm" href="/pacientes/{{ p.id }}/editar">{{ icon('edit') }} Editar ficha</a>
+    <span class="spacer" style="flex:1"></span>
+    <form method="post" action="/pacientes/{{ p.id }}/archivar" data-confirm="¿Archivar a {{ p.full_name }}? Su información se conserva." class="inline-form"><button class="btn btn-sm btn-ghost btn-danger">{{ icon('archive') }} Archivar</button></form>
+  </div>
+</div>
+
+<div class="tabs">
+  <a href="#resumen" data-tab="resumen">{{ icon('cube') }} Resumen</a>
+  <a href="#historia" data-tab="historia">{{ icon('file') }} Historia clínica</a>
+  <a href="#evolucion" data-tab="evolucion">{{ icon('clock') }} Evolución ({{ p.notes_list|length }})</a>
+  <a href="#tratamientos" data-tab="tratamientos">{{ icon('wallet') }} Tratamientos y pagos ({{ p.treatments|length }})</a>
+  <a href="#citas" data-tab="citas">{{ icon('calendar') }} Citas ({{ p.appointments|length }})</a>
+  <a href="#recordatorios" data-tab="recordatorios">{{ icon('message') }} Recordatorios</a>
+</div>
+
+{# ---------------- RESUMEN ---------------- #}
+<section class="tab-panel" id="tab-resumen">
+  <div class="mb">
+      {% set odo = h.odontograma %}
+      {% set quads = {1: 'Superior derecho', 2: 'Superior izquierdo', 3: 'Inferior izquierdo', 4: 'Inferior derecho'} %}
+      {% set kinds = {1:'Incisivo central',2:'Incisivo lateral',3:'Canino',4:'1er premolar',5:'2º premolar',6:'1er molar',7:'2º molar',8:'3er molar'} %}
+      <div class="card">
+        <div class="card-head">
+          <h2>{% set nb = odo.values()|select('equalto','bracket')|list|length %}{% set nh = odo|length - nb %}{{ icon('cube') }}Tipodonto 3D <span class="muted" style="font-weight:400">· {{ nh }} hallazgo{{ 's' if nh != 1 }}{% if nb %} · {{ nb }} brackets{% endif %}</span></h2>
+          <div class="row wrap" style="gap:8px">
+            <div class="seg" role="group" aria-label="Vista de la boca">
+              <a href="#" class="active" data-typo-view="cerrada">Cerrada</a>
+              <a href="#" data-typo-view="abierta">Abierta</a>
+            </div>
+            <button type="button" class="btn btn-xs" data-typo-reset>{{ icon('rotate') }} Restablecer</button>
+            <a class="go" href="#historia" data-tab="historia">Editar odontograma {{ icon('arrow-right') }}</a></div>
+        </div>
+        <div class="typo">
+          <div class="scene" data-typodont data-list="#zone-list" data-odonto='{{ h.odontograma_json }}' data-states='{{ tooth_states_json }}'>
+            <div class="scene-skeleton"></div>
+            <span class="scene-hint">{{ icon('rotate') }} Arrastra para girar · elige una pieza para verla de cerca</span>
+          </div>
+          <div class="typo-side">
+            <h3>Piezas por zona</h3>
+            <ul class="zone-list" id="zone-list">
+              {% for q in [1, 2, 3, 4] %}
+                {% set items = [] %}
+                {% for k, v in odo.items()|sort %}{% if k|int // 10 == q and v != 'bracket' %}{% set _ = items.append((k, v)) %}{% endif %}{% endfor %}
+                {% if items %}
+                <li class="zone-group">{{ quads[q] }}</li>
+                {% for k, v in items %}
+                <li><button type="button" data-fdi="{{ k }}">
+                  <span class="swatch" style="background:{{ tooth_states[v][1] }};box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)"></span>
+                  <span class="tno">{{ k }}</span>
+                  <span>{{ tooth_states[v][0] }}<small>{{ kinds[k|int % 10] }}</small></span>
+                </button></li>
+                {% endfor %}
+                {% endif %}
+              {% endfor %}
+              {% if nb %}
+              <li class="zone-group">Ortodoncia</li>
+              <li><button type="button" data-typo-reset><span class="swatch" style="background:{{ tooth_states['bracket'][1] }}"></span><span class="tno">{{ nb }}</span><span>Brackets cementados<small>Aparatología fija · ver arcada completa</small></span></button></li>
+              {% endif %}
+              {% if not odo %}<li class="empty">Sin hallazgos registrados. Marca piezas en la pestaña Historia clínica.</li>{% endif %}
+            </ul>
+          </div>
+        </div>
+      </div>
+  </div>
+  <div class="grid g-main">
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><h2>Diagnóstico y plan</h2><a class="btn btn-xs btn-ghost" href="#historia" data-tab="historia">Editar</a></div>
+        <div class="card-body">
+          <p><b>Motivo de consulta:</b> {{ h.motivo_consulta or '—' }}</p>
+          <p><b>Diagnóstico:</b> {{ h.diagnostico or '—' }}</p>
+          <p><b>Plan de tratamiento:</b> {{ h.plan_tratamiento or '—' }}</p>
+          <p class="muted" style="margin:0">Última actualización: {{ h.updated_at|fecha('fechahora') }}{% if h.updated_by %} por {{ h.updated_by.short_name }}{% endif %}</p>
+        </div>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><h2>Próximas citas</h2></div>
+        {% set upcoming = p.appointments|selectattr('status','in',['programada','confirmada'])|list|reverse|list %}
+        {% if upcoming %}<ul class="list">{% for a in upcoming[:4] %}
+          <li><div class="grow"><a class="title" href="/citas/{{ a.id }}" style="color:var(--ink)">{{ a.start|fecha('diames') }} · {{ a.start|fecha('hora') }}</a><div class="meta">{{ a.type }} · {{ a.doctor.short_name }}{% if a.external %} + {{ a.external.full_name }}{% endif %}</div></div>{{ status_pill(a.status) }}</li>
+        {% endfor %}</ul>{% else %}<div class="empty">Sin citas próximas.</div>{% endif %}
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Última evolución</h2></div>
+        {% if p.notes_list %}{% set n = p.notes_list[0] %}
+        <div class="card-body"><b>{{ n.procedure }}</b> <small class="muted">· {{ n.date|fecha }}</small><p style="margin-top:6px">{{ n.note }}</p>{% if n.next_step %}<small class="muted">Siguiente: {{ n.next_step }}</small>{% endif %}</div>
+        {% else %}<div class="empty">Sin notas.</div>{% endif %}
+      </div>
+      <div class="card card-pad">
+        <h3 style="margin-bottom:8px">Datos de contacto</h3>
+        <p class="muted" style="margin:0">{{ p.email or 'Sin correo' }}<br>{{ p.address or 'Sin domicilio' }}{% if p.emergency_contact %}<br>Emergencia: {{ p.emergency_contact }}{% endif %}</p>
+        {% if p.notes %}<p style="margin-top:8px"><b>Notas:</b> {{ p.notes }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ---------------- HISTORIA CLÍNICA ---------------- #}
+<section class="tab-panel" id="tab-historia">
+  <form method="post" action="/pacientes/{{ p.id }}/historia" class="card card-pad">
+    <fieldset>
+      <legend>Motivo de consulta</legend>
+      <div class="form-grid">
+        <div class="field"><label>Motivo de consulta</label><textarea name="motivo_consulta">{{ h.motivo_consulta }}</textarea></div>
+        <div class="field"><label>Padecimiento actual</label><textarea name="padecimiento_actual">{{ h.padecimiento_actual }}</textarea></div>
+      </div>
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
+      <legend>Antecedentes</legend>
+      <div class="form-grid">
+        <div class="field"><label>Heredofamiliares</label><textarea name="antecedentes_heredofamiliares">{{ h.antecedentes_heredofamiliares }}</textarea></div>
+        <div class="field"><label>Personales patológicos</label><textarea name="antecedentes_patologicos">{{ h.antecedentes_patologicos }}</textarea></div>
+        <div class="field"><label>Personales no patológicos (hábitos, higiene)</label><textarea name="antecedentes_no_patologicos">{{ h.antecedentes_no_patologicos }}</textarea></div>
+        <div class="field"><label>Alergias</label><textarea name="alergias" placeholder="Medicamentos, látex, anestésicos…">{{ h.alergias }}</textarea></div>
+        <div class="field"><label>Medicamentos actuales</label><input type="text" name="medicamentos" value="{{ h.medicamentos }}"></div>
+        <div class="field"><label>Presión arterial</label><input type="text" name="presion_arterial" value="{{ h.presion_arterial }}" placeholder="120/80"></div>
+      </div>
+      <div class="checks">
+        {% for k, l in [('diabetes','Diabetes'),('hipertension','Hipertensión'),('cardiopatia','Cardiopatía'),('coagulacion','Trastorno de coagulación'),('embarazo','Embarazo'),('fumador','Fumador(a)'),('bruxismo','Bruxismo')] %}
+        <label class="check"><input type="checkbox" name="{{ k }}" {{ 'checked' if h[k] }}> {{ l }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
+      <legend>Exploración</legend>
+      <div class="form-grid">
+        <div class="field"><label>Extraoral (cara, ATM, ganglios)</label><textarea name="exploracion_extraoral">{{ h.exploracion_extraoral }}</textarea></div>
+        <div class="field"><label>Intraoral (mucosas, encía, lengua)</label><textarea name="exploracion_intraoral">{{ h.exploracion_intraoral }}</textarea></div>
+        <div class="field"><label>Higiene oral</label><select name="higiene_oral">{% for o in ['', 'Buena', 'Regular', 'Mala'] %}<option {{ 'selected' if h.higiene_oral == o }}>{{ o }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Oclusión</label><input type="text" name="oclusion" value="{{ h.oclusion }}" placeholder="Clase I / II / III, mordida…"></div>
+      </div>
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
+      <legend>Odontograma</legend>
+      <p class="muted">Elige un estado en la paleta y haz clic en cada diente (numeración FDI). Clic de nuevo para quitarlo.</p>
+      <input type="hidden" name="odontograma_json" id="odontograma_json" value="{{ h.odontograma_json }}">
+      {% with readonly=False %}{% include "patients/_odontogram.html" %}{% endwith %}
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
+      <legend>Diagnóstico y plan</legend>
+      <div class="form-grid">
+        <div class="field"><label>Diagnóstico</label><textarea name="diagnostico">{{ h.diagnostico }}</textarea></div>
+        <div class="field"><label>Plan de tratamiento</label><textarea name="plan_tratamiento">{{ h.plan_tratamiento }}</textarea></div>
+        <div class="field"><label>Pronóstico</label><select name="pronostico">{% for o in ['', 'Favorable', 'Reservado', 'Desfavorable'] %}<option {{ 'selected' if h.pronostico == o }}>{{ o }}</option>{% endfor %}</select></div>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" name="consentimiento_firmado" {{ 'checked' if h.consentimiento_firmado }}> Consentimiento informado firmado</label>
+        <label class="check"><input type="checkbox" name="aviso_privacidad" {{ 'checked' if h.aviso_privacidad }}> Aviso de privacidad aceptado</label>
+      </div>
+    </fieldset>
+    <div class="actions"><button class="btn btn-primary">Guardar historia clínica</button>
+      <a class="btn" href="/pacientes/{{ p.id }}/historia/imprimir" target="_blank">{{ icon('printer') }} Vista de impresión</a></div>
+  </form>
+</section>
+
+{# ---------------- EVOLUCIÓN ---------------- #}
+<section class="tab-panel" id="tab-evolucion">
+  <div class="grid g-main">
+    <div class="card card-pad">
+      {% if p.notes_list %}
+      <ul class="timeline">
+        {% for n in p.notes_list %}
+        <li>
+          <div class="row between wrap"><b>{{ n.procedure or 'Nota' }}</b><small class="muted">{{ n.date|fecha('fechahora') }} · {{ n.doctor.short_name }}</small></div>
+          {% if n.teeth %}<small class="muted">Piezas: {{ n.teeth }}</small>{% endif %}
+          <p style="margin:4px 0">{{ n.note }}</p>
+          {% if n.next_step %}<small class="pill pill-brand">Siguiente: {{ n.next_step }}</small>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<div class="empty">Aún no hay notas de evolución.</div>{% endif %}
+    </div>
+    <form method="post" action="/pacientes/{{ p.id }}/notas" class="card card-pad">
+      <h2 style="margin-bottom:12px">Nueva nota de evolución</h2>
+      <div class="field"><label>Procedimiento</label><input type="text" name="procedure" placeholder="Ej. Cambio de arco, resina clase IV…"></div>
+      <div class="field"><label>Piezas dentales</label><input type="text" name="teeth" placeholder="Ej. 11, 21"></div>
+      <div class="field"><label>Nota</label><textarea name="note" required></textarea></div>
+      <div class="field"><label>Siguiente paso</label><input type="text" name="next_step" placeholder="Ej. Control en 4 semanas"></div>
+      <button class="btn btn-primary">Agregar nota</button>
+    </form>
+  </div>
+</section>
+
+{# ---------------- TRATAMIENTOS ---------------- #}
+<section class="tab-panel" id="tab-tratamientos">
+  <div class="grid g-main">
+    <div class="stack">
+      {% for t in p.treatments %}
+      <div class="card">
+        <div class="card-head">
+          <div><h2>{{ t.name }}</h2><small class="muted">{{ t.doctor.short_name }} · creado {{ t.created_at|fecha }}{% if t.external %} · con {{ t.external.full_name }}{% endif %}</small></div>
+          {{ status_pill(t.status) }}
+        </div>
+        <div class="card-body">
+          <div class="grid g-4" style="gap:10px">
+            <div><small class="muted">Total</small><div class="tnum"><b>{{ t.net_total|money }}</b>{% if t.discount %} <small class="muted">(desc. {{ t.discount|money0 }})</small>{% endif %}</div></div>
+            <div><small class="muted">Pagado</small><div class="tnum" style="color:var(--ok)"><b>{{ t.paid|money }}</b></div></div>
+            <div><small class="muted">Saldo</small><div class="tnum" style="color:{{ 'var(--bad)' if t.balance else 'inherit' }}"><b>{{ t.balance|money }}</b></div></div>
+            <div><small class="muted">Sesiones</small><div class="tnum"><b>{{ t.sessions_done }}/{{ t.sessions_planned }}</b></div></div>
+          </div>
+          <div class="row mt" style="gap:14px">
+            <div style="flex:1"><small class="muted">Avance clínico</small><div class="progress"><span style="width:{{ t.progress_pct }}%"></span></div></div>
+            <div style="flex:1"><small class="muted">Pagado {{ t.paid_pct }}%</small><div class="progress blue"><span style="width:{{ t.paid_pct }}%"></span></div></div>
+          </div>
+          {% if t.description %}<p class="muted mt" style="margin-bottom:0">{{ t.description }}</p>{% endif %}
+          {% if t.external_fee %}<p class="muted" style="margin:4px 0 0">Honorarios especialista: {{ t.external_fee|money }} (registrado como gasto)</p>{% endif %}
+
+          {% if t.payments %}
+          <div class="table-wrap mt"><table class="table">
+            <thead><tr><th>Fecha</th><th>Método</th><th>Referencia</th><th class="num">Monto</th><th></th></tr></thead>
+            <tbody>{% for pay in t.payments %}
+              <tr><td>{{ pay.date|fecha }}</td><td>{{ pay.method }}</td><td class="muted">{{ pay.reference or '—' }}</td><td class="num">{{ pay.amount|money }}</td>
+                <td class="num"><a class="btn btn-xs" href="/pagos/{{ pay.id }}/recibo" target="_blank" title="Recibo">{{ icon('receipt') }}</a>
+                {% if pay.doctor_id == user.id %}<form method="post" action="/pagos/{{ pay.id }}/eliminar" class="inline-form" data-confirm="¿Eliminar este abono?"><button class="btn btn-xs btn-ghost btn-danger" title="Eliminar">{{ icon('x') }}</button></form>{% endif %}</td></tr>
+            {% endfor %}</tbody>
+          </table></div>
+          {% endif %}
+
+          <div class="row wrap mt" style="gap:8px;align-items:flex-end">
+            {% if t.balance > 0 and t.status != 'cancelado' %}
+            <form method="post" action="/pagos/nuevo" class="row wrap" style="gap:8px;align-items:flex-end;flex:1">
+              <input type="hidden" name="treatment_id" value="{{ t.id }}">
+              <div style="width:130px"><label>Abono</label><input type="number" step="0.01" min="1" max="{{ t.balance }}" name="amount" placeholder="{{ t.balance|round(0)|int }}" required></div>
+              <div style="width:150px"><label>Método</label><select name="method">{% for m in cfg.PAYMENT_METHODS %}<option>{{ m }}</option>{% endfor %}</select></div>
+              <div style="width:140px"><label>Fecha</label><input type="date" name="date" value="{{ today() }}"></div>
+              <div style="width:120px"><label>Referencia</label><input type="text" name="reference" placeholder="Opcional"></div>
+              <button class="btn btn-primary">{{ icon('plus') }} Registrar abono</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/tratamientos/{{ t.id }}" class="row" style="gap:6px;align-items:flex-end">
+              <div><label>Estado</label><select name="status" onchange="this.form.submit()">{% for s in ['presupuesto','en proceso','terminado','cancelado'] %}<option {{ 'selected' if t.status == s }}>{{ s }}</option>{% endfor %}</select></div>
+              <div style="width:90px"><label>Sesiones</label><input type="number" name="sessions_done" min="0" value="{{ t.sessions_done }}" onchange="this.form.submit()"></div>
+            </form>
+            <a class="btn btn-sm" href="/tratamientos/{{ t.id }}/presupuesto" target="_blank">{{ icon('file') }} Presupuesto</a>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="card"><div class="empty">Sin tratamientos. Crea un presupuesto con el formulario.</div></div>
+      {% endfor %}
+    </div>
+
+    <form method="post" action="/tratamientos/nuevo" class="card card-pad" style="align-self:start">
+      <h2 style="margin-bottom:12px">Nuevo tratamiento / presupuesto</h2>
+      <input type="hidden" name="patient_id" value="{{ p.id }}">
+      <div class="field"><label>Tratamiento</label><input type="text" name="name" required list="tx-catalog" placeholder="Ej. Ortodoncia con alineadores"></div>
+      <datalist id="tx-catalog">
+        {% for n in ['Ortodoncia fija brackets metálicos','Ortodoncia brackets estéticos (zafiro)','Ortodoncia con alineadores','Retenedores Essix','Ortopedia maxilar (niño)','Blanqueamiento en consultorio','Carillas de disilicato','Carillas de resina','Resinas estéticas','Diseño de sonrisa digital','Coronas de zirconia','Limpieza + pulido','Extracción de terceros molares'] %}<option value="{{ n }}">{% endfor %}
+      </datalist>
+      <div class="form-grid">
+        <div class="field"><label>Costo total</label><input type="number" step="0.01" name="total" required></div>
+        <div class="field"><label>Descuento</label><input type="number" step="0.01" name="discount" value="0"></div>
+        <div class="field"><label>Sesiones estimadas</label><input type="number" name="sessions_planned" value="1" min="1"></div>
+        <div class="field"><label>Estado inicial</label><select name="status"><option value="presupuesto">Presupuesto</option><option value="en proceso">Aceptado / en proceso</option></select></div>
+      </div>
+      <div class="field"><label>Doctor responsable</label><select name="doctor_id">{% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if d.id == user.id }}>{{ d.full_name }}</option>{% endfor %}</select></div>
+      <div class="form-grid">
+        <div class="field"><label>Especialista externo</label><select name="external_id"><option value="">Ninguno</option>{% for e in externals %}<option value="{{ e.id }}">{{ e.full_name }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Honorarios externo</label><input type="number" step="0.01" name="external_fee" value="0"><div class="hint">Se registra como gasto del doctor.</div></div>
+      </div>
+      <div class="field"><label>Descripción / qué incluye</label><textarea name="description"></textarea></div>
+      <button class="btn btn-primary">Crear tratamiento</button>
+    </form>
+  </div>
+</section>
+
+{# ---------------- CITAS ---------------- #}
+<section class="tab-panel" id="tab-citas">
+  <div class="card">
+    <div class="card-head"><h2>Historial de citas</h2><a class="btn btn-sm btn-primary" href="/citas/nueva?paciente={{ p.id }}">{{ icon('plus') }} Agendar</a></div>
+    {% if p.appointments %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Doctor</th><th>Estado</th><th></th></tr></thead>
+      <tbody>{% for a in p.appointments %}
+        <tr><td>{{ a.start|fecha('diames') }} {{ a.start.year }}</td><td class="tnum">{{ a.start|fecha('hora') }}–{{ a.end|fecha('hora') }}</td>
+          <td>{{ a.type }}{% if a.external %} <span class="pill pill-violet">{{ a.external.full_name }}</span>{% endif %}</td>
+          <td>{{ a.doctor.short_name }}</td><td>{{ status_pill(a.status) }}</td>
+          <td class="num"><a class="btn btn-xs" href="/citas/{{ a.id }}">Abrir</a></td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="empty">Sin citas registradas.</div>{% endif %}
+  </div>
+</section>
+
+{# ---------------- RECORDATORIOS ---------------- #}
+<section class="tab-panel" id="tab-recordatorios">
+  <div class="grid g-main">
+    <div class="card">
+      {% if p.reminders %}
+      <ul class="list">{% for r in p.reminders %}
+        <li><div class="grow"><div class="title">{{ r.kind }}</div><div class="meta">{{ r.due_date|fecha }} ({{ r.due_date|rel }}) · {{ r.doctor.short_name }}{% if r.auto %} · automático{% endif %}</div></div>
+          {{ status_pill(r.status) }}
+          {% if r.status == 'pendiente' and p.phone %}<a class="btn btn-xs btn-wa" target="_blank" rel="noopener" href="{{ wa(p.phone, reminder_links[r.id]) }}">{{ icon('message') }}</a>{% endif %}
+        </li>{% endfor %}</ul>
+      {% else %}<div class="empty">Sin recordatorios.</div>{% endif %}
+    </div>
+    <form method="post" action="/recordatorios/nuevo" class="card card-pad" style="align-self:start">
+      <h2 style="margin-bottom:12px">Programar recordatorio</h2>
+      <input type="hidden" name="patient_id" value="{{ p.id }}"><input type="hidden" name="next" value="/pacientes/{{ p.id }}#recordatorios">
+      <div class="field"><label>Motivo</label><select name="kind">{% for k in ['Limpieza semestral','Ajuste mensual de ortodoncia','Revisión de retenedores','Revisión / retoque de blanqueamiento','Control de carillas','Revisión post-quirúrgica','Seguimiento de valoración (presupuesto)','Otro'] %}<option>{{ k }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Fecha del aviso</label><input type="date" name="due_date" required></div>
+      <div class="field"><label>Mensaje personalizado (opcional)</label><textarea name="message" placeholder="Si lo dejas vacío se usa el mensaje estándar."></textarea></div>
+      <button class="btn btn-primary">Guardar</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}<script type="module" src="/static/js/typodont3d.js?v=3"></script>{% endblock %}

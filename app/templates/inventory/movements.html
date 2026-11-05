@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Kardex{% endblock %}
+{% block topactions %}<a class="btn btn-sm" href="/inventario">{{ icon('chev-left') }} Inventario</a>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Kardex de movimientos</h1><p>Historial de entradas, usos clínicos, ventas, mermas y ajustes (últimos 300).</p></div>
+  <div class="seg">{% for t, l in [('','Todos'),('entrada','Entradas'),('uso','Usos'),('venta','Ventas'),('merma','Mermas'),('ajuste','Ajustes')] %}<a href="/inventario/movimientos?tipo={{ t }}" class="{{ 'active' if tipo == t }}">{{ l }}</a>{% endfor %}</div>
+</div>
+<div class="card">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Motivo</th><th>Lote</th><th class="num">Cantidad</th><th class="num">Importe</th></tr></thead>
+    <tbody>{% for m in items %}
+      <tr><td>{{ m.date|fecha('fechahora') }}</td><td><a class="rowlink" href="/inventario/producto/{{ m.product_id }}">{{ m.product.name }}</a></td>
+        <td><span class="pill {{ {'entrada':'pill-ok','venta':'pill-brand','uso':'pill-info','merma':'pill-bad','ajuste':'pill-warn'}[m.kind] }}">{{ m.kind|capitalize }}</span></td>
+        <td>{{ m.reason }}{% if m.patient %} <small class="muted">· {{ m.patient.full_name }}</small>{% endif %}</td>
+        <td class="tnum muted">{{ m.lot.lot_code if m.lot }}</td>
+        <td class="num">{{ '+' if m.quantity > 0 }}{{ m.quantity|qty }}</td><td class="num">{{ m.total|money }}</td></tr>
+    {% else %}<tr><td colspan="7" class="empty">Sin movimientos.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+{% endblock %}

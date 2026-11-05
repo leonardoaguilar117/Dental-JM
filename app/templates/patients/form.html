@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar paciente' if p else 'Nuevo paciente' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ 'Editar: ' ~ p.full_name if p else 'Nuevo paciente' }}</h1>
+    <p>{{ 'Actualiza la ficha de identificación.' if p else 'Ficha de identificación. Después podrás llenar la historia clínica y el odontograma.' }}</p></div>
+</div>
+<form method="post" class="card card-pad" style="max-width:900px">
+  <fieldset>
+    <legend>Datos personales</legend>
+    <div class="form-grid">
+      <div class="field"><label>Nombre(s) *</label><input type="text" name="first_name" required value="{{ p.first_name if p }}"></div>
+      <div class="field"><label>Apellidos *</label><input type="text" name="last_name" required value="{{ p.last_name if p }}"></div>
+      <div class="field"><label>Fecha de nacimiento</label><input type="date" name="birth_date" value="{{ p.birth_date if p and p.birth_date }}"></div>
+      <div class="field"><label>Sexo</label>
+        <select name="sex">{% for s in ['', 'Femenino', 'Masculino', 'Otro'] %}<option {{ 'selected' if p and p.sex == s }}>{{ s }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Ocupación</label><input type="text" name="occupation" value="{{ p.occupation if p }}"></div>
+      <div class="field"><label>¿Cómo nos conoció?</label><input type="text" name="referred_by" value="{{ p.referred_by if p }}" placeholder="Instagram, recomendación…"></div>
+    </div>
+  </fieldset>
+  <hr class="section-sep">
+  <fieldset>
+    <legend>Contacto</legend>
+    <div class="form-grid">
+      <div class="field"><label>Teléfono celular (WhatsApp)</label><input type="tel" name="phone" value="{{ p.phone if p }}" placeholder="10 dígitos"><div class="hint">Se usa para enviar recordatorios por WhatsApp.</div></div>
+      <div class="field"><label>Correo electrónico</label><input type="email" name="email" value="{{ p.email if p }}"></div>
+      <div class="field span-2"><label>Domicilio</label><input type="text" name="address" value="{{ p.address if p }}"></div>
+      <div class="field span-2"><label>Contacto de emergencia / tutor (menores de edad)</label><input type="text" name="emergency_contact" value="{{ p.emergency_contact if p }}" placeholder="Nombre, parentesco y teléfono"></div>
+    </div>
+  </fieldset>
+  <hr class="section-sep">
+  <div class="form-grid">
+    <div class="field"><label>Doctor tratante</label>
+      <select name="primary_doctor_id">{% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if (p and p.primary_doctor_id == d.id) or (not p and d.id == user.id) }}>{{ d.full_name }} · {{ d.specialty }}</option>{% endfor %}</select></div>
+    <div class="field span-2"><label>Notas administrativas</label><textarea name="notes" placeholder="Preferencias de horario, forma de pago, etc.">{{ p.notes if p }}</textarea></div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary">{{ 'Guardar cambios' if p else 'Registrar paciente' }}</button>
+    <a class="btn" href="{{ '/pacientes/' ~ p.id if p else '/pacientes' }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

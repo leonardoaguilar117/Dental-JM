@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Presupuesto · {{ t.patient.full_name }}{% endblock %}
+{% block topactions %}<button class="btn btn-sm btn-primary" onclick="window.print()">{{ icon('printer') }} Imprimir / guardar PDF</button>
+{% if t.patient.phone %}<a class="btn btn-sm btn-wa" target="_blank" rel="noopener" href="{{ wa(t.patient.phone, 'Hola ' ~ t.patient.first_name ~ ', te comparto el presupuesto de tu tratamiento «' ~ t.name ~ '» por ' ~ (t.net_total|money) ~ '. Cualquier duda con gusto te atendemos.') }}">{{ icon('message') }} Enviar resumen</a>{% endif %}{% endblock %}
+{% block content %}
+<div class="print-sheet">
+  <div class="doc-head">
+    <div><h1>Presupuesto de tratamiento</h1><small class="muted">Consultorio Dental JM · Folio P-{{ '%05d'|format(t.id) }}</small></div>
+    <div style="text-align:right"><b>{{ t.doctor.full_name }}</b><br><small class="muted">{{ t.doctor.specialty }}</small><br><small class="muted">{{ t.created_at|fecha('larga') }}</small></div>
+  </div>
+  <dl>
+    <dt>Paciente</dt><dd>{{ t.patient.full_name }}</dd>
+    <dt>Tratamiento</dt><dd>{{ t.name }}</dd>
+    {% if t.description %}<dt>Incluye</dt><dd>{{ t.description }}</dd>{% endif %}
+    <dt>Sesiones estimadas</dt><dd>{{ t.sessions_planned }}</dd>
+    {% if t.external %}<dt>Especialista</dt><dd>{{ t.external.full_name }} ({{ t.external.specialty }})</dd>{% endif %}
+  </dl>
+  <table class="table">
+    <tbody>
+      <tr><td>Costo del tratamiento</td><td class="num">{{ t.total|money }}</td></tr>
+      {% if t.discount %}<tr><td>Descuento</td><td class="num">−{{ t.discount|money }}</td></tr>{% endif %}
+      <tr><td><b>Total</b></td><td class="num"><b>{{ t.net_total|money }}</b></td></tr>
+      <tr><td>Pagado a la fecha</td><td class="num">{{ t.paid|money }}</td></tr>
+      <tr><td><b>Saldo</b></td><td class="num"><b>{{ t.balance|money }}</b></td></tr>
+    </tbody>
+  </table>
+  <p class="muted mt">Presupuesto válido por 30 días. Los precios pueden variar si el plan de tratamiento cambia. Se aceptan pagos en efectivo, tarjeta y transferencia; es posible pagar en abonos.</p>
+  <div class="signature"><div>Acepto el presupuesto · {{ t.patient.full_name }}</div><div>{{ t.doctor.full_name }}</div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_icons.html" import status_pill %}
+{% block title %}Recordatorios{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Recordatorios a pacientes</h1><p>Limpiezas, ajustes y visitas de seguimiento. Se crean automáticamente al marcar una cita como atendida, o manualmente aquí.</p></div>
+  <div class="seg">
+    {% for e, l in [('pendiente','Pendientes'),('enviado','Enviados'),('completado','Completados'),('todos','Todos')] %}
+    <a href="/recordatorios?estado={{ e }}" class="{{ 'active' if estado == e }}">{{ l }}</a>
+    {% endfor %}
+  </div>
+</div>
+<div class="grid g-main">
+  <div class="card">
+    {% if items %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Fecha</th><th>Paciente</th><th>Motivo</th><th>Estado</th><th class="num">Acciones</th></tr></thead>
+      <tbody>{% for r in items %}
+        {% set overdue = r.status == 'pendiente' and r.due_date < today() %}
+        <tr>
+          <td><b class="{{ 'delta-down' if overdue }}">{{ r.due_date|fecha }}</b><div class="muted" style="font-size:12px">{{ r.due_date|rel }}</div></td>
+          <td><a class="rowlink" href="/pacientes/{{ r.patient_id }}#recordatorios">{{ r.patient.full_name }}</a><div class="muted" style="font-size:12px">{{ r.patient.phone }}</div></td>
+          <td>{{ r.kind }}{% if r.auto %} <span class="pill">auto</span>{% endif %}</td>
+          <td>{{ status_pill(r.status) }}{% if r.sent_at %}<div class="muted" style="font-size:11.5px">{{ r.sent_at|fecha('fechahora') }}</div>{% endif %}</td>
+          <td class="num" style="white-space:nowrap">
+            {% if r.status == 'pendiente' %}
+              <form id="sent-{{ r.id }}" method="post" action="/recordatorios/{{ r.id }}/enviado" class="inline-form"><input type="hidden" name="next" value="/recordatorios?estado={{ estado }}"></form>
+              <a class="btn btn-xs btn-wa" href="{{ links[r.id] }}" target="_blank" rel="noopener" data-mark-sent="sent-{{ r.id }}">{{ icon('message') }} WhatsApp</a>
+              <form method="post" action="/recordatorios/{{ r.id }}/descartar" class="inline-form"><input type="hidden" name="next" value="/recordatorios?estado={{ estado }}"><button class="btn btn-xs btn-ghost" title="Descartar">{{ icon('x') }}</button></form>
+            {% elif r.status == 'enviado' %}
+              <a class="btn btn-xs" href="/citas/nueva?paciente={{ r.patient_id }}">{{ icon('calendar') }} Agendó</a>
+              <form method="post" action="/recordatorios/{{ r.id }}/completar" class="inline-form"><input type="hidden" name="next" value="/recordatorios?estado={{ estado }}"><button class="btn btn-xs">{{ icon('check') }} Completar</button></form>
+            {% else %}
+              <form method="post" action="/recordatorios/{{ r.id }}/reabrir" class="inline-form"><input type="hidden" name="next" value="/recordatorios?estado={{ estado }}"><button class="btn btn-xs btn-ghost">Reabrir</button></form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="empty">{{ icon('message') }}<div>No hay recordatorios en esta vista.</div></div>{% endif %}
+  </div>
+  <div class="stack">
+    <form method="post" action="/recordatorios/nuevo" class="card card-pad">
+      <h2 style="margin-bottom:12px">Nuevo recordatorio</h2>
+      <div class="field"><label>Paciente</label><select name="patient_id" required><option value="">Selecciona…</option>{% for p in patients %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Motivo</label><select name="kind">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Fecha del aviso</label><input type="date" name="due_date" required></div>
+      <div class="field"><label>Mensaje (opcional)</label><textarea name="message" placeholder="Se usa un mensaje estándar si lo dejas vacío."></textarea></div>
+      <button class="btn btn-primary">Crear</button>
+    </form>
+    <div class="card card-pad">
+      <h3 style="margin-bottom:6px">¿Cómo funciona?</h3>
+      <p class="muted" style="margin:0">1. El aviso aparece en <b>Avisos</b> {{ cfg.REMINDER_WINDOW_DAYS }} días antes de la fecha.<br>2. Pulsa <b>WhatsApp</b>: se abre el chat con el mensaje redactado; tú lo revisas y lo envías.<br>3. Se marca como <b>enviado</b>; cuando el paciente agenda, márcalo como <b>completado</b>.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

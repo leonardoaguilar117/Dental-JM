@@ -1,0 +1,32 @@
+# Blueprint de Render: crea el servicio web (Docker) + una base PostgreSQL.
+# Render > New > Blueprint > selecciona el repositorio.
+services:
+  - type: web
+    name: consultorio-dental-jm
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SEED_DEMO
+        value: "true"
+      - key: TZ_CONSULTORIO
+        value: America/Mexico_City
+      - key: WHATSAPP_COUNTRY_CODE
+        value: "52"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: consultorio-jm-db
+          property: connectionString
+      # Opcional: pega aquí el JSON completo de la cuenta de servicio de Google
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+
+databases:
+  - name: consultorio-jm-db
+    plan: free
+    databaseName: consultorio_jm
+    user: consultorio

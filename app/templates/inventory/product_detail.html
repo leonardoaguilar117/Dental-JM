@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block topactions %}<a class="btn btn-sm" href="/inventario">{{ icon('chev-left') }} Inventario</a>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="row wrap" style="gap:8px"><h1>{{ p.name }}</h1>{% if p.is_low %}<span class="pill pill-info">Bajo mínimo</span>{% endif %}</div>
+    <p>{{ p.sku }} · {{ p.brand or 'Sin marca' }} · {{ p.category }} · {{ p.location or 'Sin ubicación' }}</p>
+  </div>
+</div>
+
+<div class="grid g-4 mb">
+  <div class="card kpi"><div class="label">Existencia</div><div class="value" style="color:{{ 'var(--bad)' if p.is_low }}">{{ p.stock|qty }}</div><div class="sub">{{ p.unit }} · mínimo {{ p.min_stock|round(0)|int }}</div></div>
+  <div class="card kpi"><div class="label">Valor a costo</div><div class="value">{{ p.stock_value|money0 }}</div><div class="sub">Costo unitario {{ p.cost_price|money }}</div></div>
+  <div class="card kpi"><div class="label">Precio de venta</div><div class="value">{{ p.sale_price|money0 }}</div><div class="sub">Margen {{ ((p.sale_price - p.cost_price) / p.cost_price * 100)|round(0)|int if p.cost_price else 0 }}%</div></div>
+  <div class="card kpi"><div class="label">Próxima caducidad</div><div class="value" style="font-size:19px">{{ p.next_expiry|fecha if p.next_expiry else ('No caduca' if not p.tracks_expiry else '—') }}</div><div class="sub">{{ p.next_expiry|rel }}</div></div>
+</div>
+
+<div class="grid g-main">
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h2>Lotes</h2><small class="muted">Orden FEFO</small></div>
+      {% set lots = p.lots|selectattr('quantity','gt',0)|list %}
+      {% if lots %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Lote</th><th>Recibido</th><th>Caducidad</th><th class="num">Cantidad</th><th class="num">Conteo físico</th><th></th></tr></thead>
+        <tbody>{% for l in lots %}
+          <tr><td class="tnum"><b>{{ l.lot_code }}</b></td><td>{{ l.received_at|fecha }}</td>
+            <td>{% if l.expiry_date %}{% set d = l.days_to_expiry %}<span class="pill {{ 'pill-bad' if d < 30 else ('pill-warn' if d <= alert_days else 'pill-ok') }}">{{ l.expiry_date|fecha }} · {{ l.expiry_date|rel }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td class="num">{{ l.quantity|qty }}</td>
+            <td class="num"><form method="post" action="/inventario/lote/{{ l.id }}/ajuste" class="row" style="gap:4px;justify-content:flex-end"><input type="number" step="0.01" min="0" name="quantity" value="{{ l.quantity|qty }}" style="width:80px;min-height:30px;padding:4px 8px"><input type="hidden" name="reason" value="Conteo físico"><button class="btn btn-xs">Ajustar</button></form></td>
+            <td class="num">{% if l.days_to_expiry is not none and l.days_to_expiry < 0 %}<form method="post" action="/inventario/lote/{{ l.id }}/baja" class="inline-form" data-confirm="¿Dar de baja el lote caducado?"><button class="btn btn-xs btn-danger">Baja</button></form>{% endif %}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% else %}<div class="empty">Sin existencias. Registra una entrada.</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Movimientos (kardex)</h2></div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Lote</th><th class="num">Cantidad</th><th class="num">Importe</th></tr></thead>
+        <tbody>{% for m in p.movements[:40] %}
+          <tr><td>{{ m.date|fecha('fechahora') }}</td>
+            <td><span class="pill {{ {'entrada':'pill-ok','venta':'pill-brand','uso':'pill-info','merma':'pill-bad','ajuste':'pill-warn'}[m.kind] }}">{{ m.kind|capitalize }}</span></td>
+            <td>{{ m.reason }}{% if m.patient %} <small class="muted">· {{ m.patient.full_name }}</small>{% endif %}</td>
+            <td class="tnum muted">{{ m.lot.lot_code if m.lot }}</td>
+            <td class="num" style="color:{{ 'var(--ok)' if m.quantity > 0 else 'var(--ink)' }}">{{ '+' if m.quantity > 0 }}{{ m.quantity|qty }}</td>
+            <td class="num">{{ m.total|money }}</td></tr>
+        {% else %}<tr><td colspan="6" class="empty">Sin movimientos.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+
+    <details class="card card-pad">
+      <summary style="cursor:pointer;font-weight:700">{{ icon('edit') }} Editar datos del producto</summary>
+      <form method="post" action="/inventario/producto/{{ p.id }}/editar" class="mt">
+        {% include "inventory/_product_fields.html" %}
+        <button class="btn btn-primary">Guardar cambios</button>
+      </form>
+    </details>
+  </div>
+
+  <div class="stack">
+    <form method="post" action="/inventario/producto/{{ p.id }}/entrada" class="card card-pad">
+      <h2 style="margin-bottom:12px">{{ icon('arrow-down') }} Entrada de mercancía</h2>
+      <div class="form-grid">
+        <div class="field"><label>Cantidad</label><input type="number" step="0.01" min="0.01" name="quantity" required></div>
+        <div class="field"><label>Costo unitario</label><input type="number" step="0.01" min="0" name="unit_cost" value="{{ p.cost_price }}"></div>
+        <div class="field"><label>Lote</label><input type="text" name="lot_code" placeholder="Ej. L24519"></div>
+        <div class="field"><label>Caducidad{{ ' *' if p.tracks_expiry }}</label><input type="date" name="expiry_date" {{ 'required' if p.tracks_expiry }}></div>
+      </div>
+      <div class="field"><label>Motivo</label><input type="text" name="reason" value="Compra a proveedor"></div>
+      <button class="btn btn-primary">Registrar entrada</button>
+    </form>
+
+    <form method="post" action="/inventario/producto/{{ p.id }}/salida" class="card card-pad">
+      <h2 style="margin-bottom:12px">{{ icon('arrow-up') }} Salida</h2>
+      <div class="field"><label>Tipo de salida</label>
+        <select name="kind" id="exit-kind">
+          <option value="uso">Uso en consulta</option>
+          <option value="venta">Venta de mostrador (suma a ingresos)</option>
+          <option value="merma">Merma / daño</option>
+        </select></div>
+      <div class="form-grid">
+        <div class="field"><label>Cantidad</label><input type="number" step="0.01" min="0.01" name="quantity" required></div>
+        <div class="field" id="price-field"><label>Precio unitario</label><input type="number" step="0.01" min="0" name="unit_price" value="{{ p.sale_price }}"></div>
+      </div>
+      <div class="field"><label>Paciente (opcional)</label><select name="patient_id"><option value="">—</option>{% for pt in patients %}<option value="{{ pt.id }}">{{ pt.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Motivo / nota</label><input type="text" name="reason" placeholder="Ej. Cementado de brackets"></div>
+      <p class="hint">Se descuenta automáticamente del lote vigente que caduca primero. Los lotes caducados no se usan ni se venden.</p>
+      <button class="btn btn-primary">Registrar salida</button>
+    </form>
+
+    <div class="card card-pad">
+      <h3>Proveedor</h3>
+      <p class="muted" style="margin:6px 0 0">{{ p.supplier or 'Sin proveedor' }}</p>
+      {% if p.notes %}<p class="muted" style="margin:6px 0 0">{{ p.notes }}</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const k = document.getElementById("exit-kind"), pf = document.getElementById("price-field");
+const sync = () => pf.style.display = k.value === "venta" ? "" : "none"; k.addEventListener("change", sync); sync();
+</script>
+{% endblock %}

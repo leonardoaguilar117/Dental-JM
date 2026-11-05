@@ -1,0 +1,21 @@
+{% set upper_r = [18,17,16,15,14,13,12,11] %}{% set upper_l = [21,22,23,24,25,26,27,28] %}
+{% set lower_r = [48,47,46,45,44,43,42,41] %}{% set lower_l = [31,32,33,34,35,36,37,38] %}
+{% set st = {} %}{% for k, v in tooth_states.items() %}{% set _ = st.update({k: [v[0], v[1]]}) %}{% endfor %}
+<div class="odonto {{ 'readonly' if readonly }}" data-odonto data-states='{{ st|tojson }}' data-value='{{ h.odontograma_json }}'>
+  <div class="arch">
+    <div class="half">{% for t in upper_r %}<div class="tooth" data-tooth="{{ t }}">{{ t }}</div>{% endfor %}</div>
+    <div class="mid"></div>
+    <div class="half">{% for t in upper_l %}<div class="tooth" data-tooth="{{ t }}">{{ t }}</div>{% endfor %}</div>
+  </div>
+  <div class="arch">
+    <div class="half">{% for t in lower_r %}<div class="tooth lower" data-tooth="{{ t }}">{{ t }}</div>{% endfor %}</div>
+    <div class="mid"></div>
+    <div class="half">{% for t in lower_l %}<div class="tooth lower" data-tooth="{{ t }}">{{ t }}</div>{% endfor %}</div>
+  </div>
+</div>
+<div class="palette">
+  {% for k, v in tooth_states.items() %}
+  {% if readonly %}<span class="pill"><span class="swatch" style="background:{{ v[1] }};border:1px solid #cbd5d1"></span>{{ v[0] }}</span>
+  {% else %}<button data-state="{{ k }}"><span class="swatch" style="background:{{ v[1] }};border:1px solid #cbd5d1"></span>{{ v[0] }}</button>{% endif %}
+  {% endfor %}
+</div>

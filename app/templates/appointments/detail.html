@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_icons.html" import status_pill %}
+{% block title %}Cita · {{ a.patient.full_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="row wrap" style="gap:10px"><h1>{{ a.type }}</h1>{{ status_pill(a.status) }}{% if a.external %}<span class="pill pill-violet">{{ icon('scalpel') }} Con {{ a.external.full_name }}</span>{% endif %}</div>
+    <p>{{ a.start|fecha('larga')|capitalize }} · {{ a.start|fecha('hora') }}–{{ a.end|fecha('hora') }} · {{ a.doctor.full_name }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-wa" href="{{ wa_confirm }}" target="_blank" rel="noopener">{{ icon('message') }} Enviar confirmación</a>
+    <a class="btn" href="{{ gcal_link }}" target="_blank" rel="noopener">{{ icon('google') }} Añadir a Google Calendar</a>
+  </div>
+</div>
+
+<div class="grid g-main">
+  <div class="stack">
+    {% if a.status not in ['atendida', 'cancelada'] %}
+    <form method="post" action="/citas/{{ a.id }}/estado" class="card">
+      <div class="card-head"><h2>{{ icon('check') }} Registrar atención</h2></div>
+      <div class="card-body">
+        <input type="hidden" name="status" value="atendida">
+        <div class="field"><label>Nota de evolución</label><textarea name="note" placeholder="Qué se realizó en la consulta…"></textarea></div>
+        <div class="form-grid">
+          <div class="field"><label>Piezas</label><input type="text" name="teeth" placeholder="Ej. 11, 21"></div>
+          <div class="field"><label>Siguiente paso</label><input type="text" name="next_step"></div>
+          {% if treatments %}
+          <div class="field span-2"><label>Sumar una sesión al tratamiento</label>
+            <select name="treatment_id"><option value="">No aplica</option>{% for t in treatments %}<option value="{{ t.id }}" {{ 'selected' if loop.first }}>{{ t.name }} ({{ t.sessions_done }}/{{ t.sessions_planned }})</option>{% endfor %}</select></div>
+          {% endif %}
+        </div>
+        {% set rule = rules.get(a.type) %}
+        <div class="alert-box alert-brand mb">
+          <label class="check" style="flex-wrap:wrap"><input type="checkbox" name="create_reminder" {{ 'checked' if rule }}> Crear recordatorio para volver a contactar al paciente en
+            <input type="number" name="reminder_days" value="{{ rule[0] if rule else 30 }}" min="1" style="width:80px;min-height:30px;padding:4px 8px"> días
+            {% if rule %}<small class="muted">({{ rule[1] }})</small>{% endif %}</label>
+        </div>
+        <button class="btn btn-primary">Marcar como atendida</button>
+      </div>
+    </form>
+    {% endif %}
+
+    <form method="post" action="/citas/{{ a.id }}" class="card">
+      <div class="card-head"><h2>{{ icon('edit') }} Reprogramar / editar</h2></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="field"><label>Inicio</label><input type="datetime-local" name="start" value="{{ a.start.strftime('%Y-%m-%dT%H:%M') }}" step="900"></div>
+          <div class="field"><label>Duración</label><select name="duration">{% for m in [15,30,45,60,90,120,180] %}<option value="{{ m }}" {{ 'selected' if a.duration_min == m }}>{{ m }} min</option>{% endfor %}</select></div>
+          <div class="field"><label>Doctor(a)</label><select name="doctor_id">{% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if a.doctor_id == d.id }}>{{ d.full_name }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Tipo</label><select name="type">{% for t in types %}<option {{ 'selected' if a.type == t }}>{{ t }}</option>{% endfor %}</select></div>
+          <div class="field span-2"><label>Especialista externo</label><select name="external_id"><option value="">No requiere</option>{% for e in externals %}<option value="{{ e.id }}" {{ 'selected' if a.external_id == e.id }}>{{ e.full_name }}</option>{% endfor %}</select></div>
+          <div class="field span-2"><label>Notas</label><textarea name="notes">{{ a.notes }}</textarea></div>
+        </div>
+        <label class="check mb"><input type="checkbox" name="force" value="1"> Ignorar conflictos de horario</label>
+        <button class="btn">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h2>Paciente</h2><a class="btn btn-xs btn-ghost" href="/pacientes/{{ a.patient_id }}">Expediente</a></div>
+      <div class="card-body">
+        <div class="row">{{ avatar(a.patient.initials, a.doctor.color) }}<div><b>{{ a.patient.full_name }}</b><div class="muted">{{ a.patient.phone }} · {{ a.patient.age }} años</div></div></div>
+        {% if a.patient.history and a.patient.history.alert_flags %}
+        <div class="alert-box alert-bad mt">{{ icon('alert') }}<span>{{ a.patient.history.alert_flags|join(' · ') }}</span></div>{% endif %}
+        {% if a.patient.balance > 0 %}<div class="alert-box alert-info mt">{{ icon('wallet') }}<span>Saldo pendiente: <b>{{ a.patient.balance|money }}</b></span></div>{% endif %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Cambiar estado</h2></div>
+      <div class="card-body row wrap" style="gap:6px">
+        {% for s in statuses if s != a.status and s != 'atendida' %}
+        <form method="post" action="/citas/{{ a.id }}/estado" class="inline-form" {% if s == 'cancelada' %}data-confirm="¿Cancelar esta cita?"{% endif %}>
+          <input type="hidden" name="status" value="{{ s }}"><button class="btn btn-sm {{ 'btn-danger' if s in ['cancelada','no asistió'] }}">{{ s|capitalize }}</button>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+    {% if a.external %}
+    <div class="card card-pad">
+      <h3>{{ icon('scalpel') }} {{ a.external.full_name }}</h3>
+      <p class="muted" style="margin:6px 0">{{ a.external.specialty }} · {{ a.external.phone }}</p>
+      {% if a.external.availability_note %}<small class="muted">{{ a.external.availability_note }}</small>{% endif %}
+      <a class="btn btn-sm btn-wa mt" target="_blank" rel="noopener" href="{{ wa(a.external.phone, 'Hola Dr., le confirmo la cirugía de ' ~ a.patient.full_name ~ ' el ' ~ (a.start|fecha('larga')) ~ ' a las ' ~ (a.start|fecha('hora')) ~ ' hrs en el Consultorio JM (' ~ a.doctor.short_name ~ '). ' ~ a.notes) }}">{{ icon('message') }} Avisar al especialista</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

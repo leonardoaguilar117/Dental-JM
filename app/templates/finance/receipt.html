@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Recibo de pago{% endblock %}
+{% block topactions %}<button class="btn btn-sm btn-primary" onclick="window.print()">{{ icon('printer') }} Imprimir</button>{% endblock %}
+{% block content %}
+<div class="print-sheet" style="max-width:560px">
+  <div class="doc-head">
+    <div><h1>Recibo de pago</h1><small class="muted">Folio R-{{ '%05d'|format(pay.id) }} · Comprobante simple (no fiscal)</small></div>
+    <div style="text-align:right"><b>Consultorio Dental JM</b><br><small class="muted">{{ pay.date|fecha('larga') }}</small></div>
+  </div>
+  <dl>
+    <dt>Recibimos de</dt><dd>{{ pay.patient.full_name }}</dd>
+    <dt>Cantidad</dt><dd><b style="font-size:18px">{{ pay.amount|money }}</b></dd>
+    <dt>Concepto</dt><dd>Abono a «{{ pay.treatment.name }}»</dd>
+    <dt>Método</dt><dd>{{ pay.method }}{% if pay.reference %} · Ref. {{ pay.reference }}{% endif %}</dd>
+    <dt>Atendió</dt><dd>{{ pay.doctor.full_name }}</dd>
+    <dt>Saldo restante</dt><dd>{{ pay.treatment.balance|money }}</dd>
+  </dl>
+  <div class="signature"><div>{{ pay.doctor.full_name }}</div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Inventario{% endblock %}
+{% block topactions %}<a class="btn btn-sm" href="/inventario/movimientos">{{ icon('file') }} Kardex</a><a class="btn btn-sm btn-primary" href="/inventario/producto/nuevo">{{ icon('plus') }} Producto</a>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Depósito dental</h1><p>Inventario de la Dra. Jimena · control por lotes con caducidad (FEFO: sale primero lo que caduca primero).</p></div>
+  <div class="actions"><a class="btn" href="/inventario/exportar.csv">{{ icon('download') }} Exportar</a></div>
+</div>
+
+<div class="grid g-4 mb">
+  <a class="card kpi" href="/inventario" style="color:inherit"><div class="label">Valor del inventario</div><div class="value">{{ total_value|money0 }}</div><div class="sub">{{ alerts.products|length }} productos activos (a costo)</div></a>
+  <a class="card kpi" href="/inventario?filtro=bajo" style="color:inherit"><div class="label"><span class="dot" style="background:var(--blue)"></span> Bajo stock mínimo</div><div class="value">{{ alerts.low|length }}</div><div class="sub">Por reordenar</div></a>
+  <a class="card kpi" href="/inventario?filtro=caducar" style="color:inherit"><div class="label"><span class="dot" style="background:#f59e0b"></span> Por caducar ({{ cfg.EXPIRY_ALERT_DAYS }} días)</div><div class="value">{{ alerts.expiring|length }}</div><div class="sub">Lotes con existencia</div></a>
+  <a class="card kpi" href="/inventario?filtro=caducados" style="color:inherit"><div class="label"><span class="dot" style="background:var(--bad)"></span> Caducados</div><div class="value" style="color:{{ 'var(--bad)' if alerts.expired }}">{{ alerts.expired|length }}</div><div class="sub">Dar de baja / no usar</div></a>
+</div>
+
+{% if alerts.expired or alerts.expiring %}
+<div class="card mb">
+  <div class="card-head"><h2>{{ icon('clock') }} Próximas caducidades</h2></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Producto</th><th>Lote</th><th>Existencia</th><th>Caduca</th><th></th></tr></thead>
+    <tbody>
+    {% for l in alerts.expired + alerts.expiring %}
+      <tr><td><a class="rowlink" href="/inventario/producto/{{ l.product_id }}">{{ l.product.name }}</a></td><td class="tnum">{{ l.lot_code }}</td><td class="tnum">{{ l.quantity|qty }} {{ l.product.unit }}</td>
+        <td>{% if l.days_to_expiry < 0 %}<span class="pill pill-bad">Caducó {{ l.expiry_date|rel }}</span>{% elif l.days_to_expiry <= 30 %}<span class="pill pill-bad">{{ l.expiry_date|fecha }} · {{ l.expiry_date|rel }}</span>{% else %}<span class="pill pill-warn">{{ l.expiry_date|fecha }} · {{ l.expiry_date|rel }}</span>{% endif %}</td>
+        <td class="num">{% if l.days_to_expiry < 0 %}<form method="post" action="/inventario/lote/{{ l.id }}/baja" class="inline-form" data-confirm="¿Dar de baja el lote {{ l.lot_code }} como merma?"><button class="btn btn-xs btn-danger">Dar de baja</button></form>{% else %}<small class="muted">Usar primero</small>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+<form class="card card-pad mb row wrap" method="get" style="gap:10px">
+  <div class="seg">
+    {% for f, l in [('todos','Todos'),('bajo','Stock bajo'),('caducar','Por caducar'),('caducados','Caducados')] %}
+    <a href="/inventario?filtro={{ f }}" class="{{ 'active' if filtro == f }}">{{ l }}</a>{% endfor %}
+  </div>
+  <input type="hidden" name="filtro" value="{{ filtro }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Buscar producto, SKU o marca…" style="flex:1;min-width:200px">
+  <select name="categoria" onchange="this.form.submit()" style="width:auto"><option value="">Todas las categorías</option>{% for c in categories %}<option {{ 'selected' if categoria == c }}>{{ c }}</option>{% endfor %}</select>
+</form>
+
+<div class="card">
+  {% if products %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th class="num">Existencia</th><th class="num">Mínimo</th><th>Próx. caducidad</th><th class="num">Costo</th><th class="num">Precio venta</th><th>Ubicación</th></tr></thead>
+    <tbody>{% for p in products %}
+      <tr>
+        <td class="tnum muted">{{ p.sku }}</td>
+        <td><a class="rowlink" href="/inventario/producto/{{ p.id }}">{{ p.name }}</a><div class="muted" style="font-size:12px">{{ p.brand }}</div></td>
+        <td>{{ p.category }}</td>
+        <td class="num"><b style="color:{{ 'var(--bad)' if p.is_low }}">{{ p.stock|qty }}</b> <small class="muted">{{ p.unit }}</small>{% if p.is_low %}<div><span class="pill pill-info">Reordenar</span></div>{% endif %}</td>
+        <td class="num">{{ p.min_stock|round(0)|int }}</td>
+        <td>{% if p.next_expiry %}{% set d = (p.next_expiry - today()).days %}<span class="pill {{ 'pill-bad' if d < 30 else ('pill-warn' if d <= cfg.EXPIRY_ALERT_DAYS else 'pill-ok') }}">{{ p.next_expiry|fecha }}</span>{% elif p.tracks_expiry %}<span class="muted">—</span>{% else %}<span class="muted">No caduca</span>{% endif %}</td>
+        <td class="num">{{ p.cost_price|money }}</td><td class="num">{{ p.sale_price|money }}</td>
+        <td class="muted">{{ p.location }}</td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty">{{ icon('box') }}<div>No hay productos con este filtro.</div></div>{% endif %}
+</div>
+
+<div class="card mt">
+  <div class="card-head"><h2>Últimos movimientos</h2><a class="btn btn-xs btn-ghost" href="/inventario/movimientos">Ver kardex</a></div>
+  <ul class="list">{% for m in recent %}
+    <li><span class="pill {{ {'entrada':'pill-ok','venta':'pill-brand','uso':'pill-info','merma':'pill-bad','ajuste':'pill-warn'}[m.kind] }}">{{ m.kind|capitalize }}</span>
+      <div class="grow"><div class="title">{{ m.product.name }}</div><div class="meta">{{ m.date|fecha('fechahora') }} · {{ m.reason }}</div></div>
+      <b class="tnum">{{ '+' if m.quantity > 0 }}{{ m.quantity|qty }}</b></li>
+  {% endfor %}</ul>
+</div>
+{% endblock %}

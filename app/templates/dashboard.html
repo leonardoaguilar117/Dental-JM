@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% from "_icons.html" import status_pill %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+{% set mes_qs = year ~ '-' ~ '%02d'|format(month) %}
+{% macro delta(v, invert=False) -%}
+  {%- if v is none -%}sin mes previo para comparar
+  {%- else -%}
+    {%- set good = (v >= 0) != invert -%}
+    <span class="{{ 'delta-up' if good else 'delta-down' }}">{{ '+' if v >= 0 }}{{ v }}%</span> vs. mes anterior
+  {%- endif -%}
+{%- endmacro %}
+
+<div class="bento">
+  {# ---------- héroe: saludo + hallazgo + escena 3D ---------- #}
+  <section class="hero b-hero" aria-label="Resumen del día">
+    <div class="hero-text">
+      <h1 style="view-transition-name: page-title">{{ 'Consultorio' if vista == 'consultorio' else user.short_name }} · {{ month_name|capitalize }}</h1>
+      {% if finding %}
+      <p class="finding">Hoy: {% for f in finding %}<b>{{ f }}</b>{{ ' · ' if not loop.last }}{% endfor %}.</p>
+      {% else %}<p class="finding">Todo al día: sin pendientes urgentes.</p>{% endif %}
+      <div class="row wrap" style="gap:8px">
+        <a class="btn btn-sm btn-primary" href="/citas/nueva">{{ icon('calendar') }} Agendar cita</a>
+        <a class="btn btn-sm btn-wa" href="/avisos">{{ icon('message') }} Enviar recordatorios</a>
+      </div>
+      <div class="controls">
+        <div class="seg" role="tablist" aria-label="Alcance">
+          <a href="/?vista=mia&mes={{ mes_qs }}" class="{{ 'active' if vista != 'consultorio' }}">Mis números</a>
+          <a href="/?vista=consultorio&mes={{ mes_qs }}" class="{{ 'active' if vista == 'consultorio' }}">Consultorio</a>
+        </div>
+        <div class="month-nav">
+          <a href="/?vista={{ vista }}&mes={{ prev_mes }}" aria-label="Mes anterior">{{ icon('chev-left') }}</a>
+          <span>{{ month_name }} {{ year }}</span>
+          <a href="/?vista={{ vista }}&mes={{ next_mes }}" aria-label="Mes siguiente">{{ icon('chev-right') }}</a>
+        </div>
+      </div>
+    </div>
+    <div class="scene" data-hero3d aria-hidden="true">
+      <div class="scene-skeleton"></div>
+      <span class="scene-hint">{{ icon('cube') }} Mueve el cursor</span>
+    </div>
+  </section>
+
+  {# ---------- indicadores en pila ---------- #}
+  <section class="card b-kpis" aria-label="Indicadores del mes">
+    <div class="kpi-stack">
+      <div>
+        <span class="kpi-label"><span class="swatch" style="background:var(--data)"></span>Ingresos</span>
+        <span class="kpi-value lead" data-count="{{ summary.ingresos.total }}" data-money>{{ summary.ingresos.total|money0 }}</span>
+        <span class="kpi-sub">{{ delta(summary.var_ingresos) }}{% if summary.ingresos.ventas %} · {{ summary.ingresos.ventas|money0 }} del depósito{% endif %}</span>
+      </div>
+      <div>
+        <span class="kpi-label"><span class="swatch" style="background:var(--data-2)"></span>Egresos</span>
+        <span class="kpi-value" data-count="{{ summary.egresos.total }}" data-money>{{ summary.egresos.total|money0 }}</span>
+        <span class="kpi-sub">{{ delta(summary.var_egresos, True) }}</span>
+      </div>
+      <div>
+        <span class="kpi-label">Utilidad</span>
+        <span class="kpi-value" style="color:{{ 'var(--positive)' if summary.utilidad >= 0 else 'var(--negative)' }}" data-count="{{ summary.utilidad }}" data-money>{{ summary.utilidad|money0 }}</span>
+        <span class="kpi-sub">Ingresos menos egresos del mes</span>
+      </div>
+      <div>
+        <span class="kpi-label">Por cobrar</span>
+        <span class="kpi-value" data-count="{{ receivable_total }}" data-money>{{ receivable_total|money0 }}</span>
+        <span class="kpi-sub"><a class="go" href="/finanzas?tab=cobrar&vista={{ vista }}">{{ receivable_items|length }}{{ '+' if receivable_items|length >= 6 }} saldos abiertos {{ icon('arrow-right') }}</a></span>
+      </div>
+    </div>
+  </section>
+
+  {# ---------- jornada de hoy ---------- #}
+  <section class="day b-full" aria-label="Jornada de hoy">
+    <div class="card-head">
+      <h2>{{ icon('clock') }}Jornada de hoy <span class="muted" style="font-weight:400">· {{ day.count }} cita{{ 's' if day.count != 1 }}</span></h2>
+      <div class="row wrap" style="gap:14px">
+        <div class="day-legend"><span><span class="swatch" style="background:var(--control)"></span>Atendida</span><span><span class="swatch" style="background:repeating-linear-gradient(135deg,var(--control) 0 2px,var(--sheet) 2px 4px)"></span>Cancelada</span></div>
+        <a class="go" href="/agenda">Agenda {{ icon('arrow-right') }}</a>
+      </div>
+    </div>
+    <div class="day-scroll">
+      <div class="day-grid">
+        <div class="day-hours"><span></span><div class="ticks">{% for h, pct in day.hours %}<span style="left:{{ pct }}%">{{ '%02d'|format(h) }}:00</span>{% endfor %}</div></div>
+        {% for lane in day.lanes %}
+        <div class="lane" style="--c:{{ lane.color }}">
+          <div class="lane-name"><span class="swatch" style="background:{{ lane.color }}"></span><span title="{{ lane.name }}">{{ lane.short }}</span></div>
+          <div class="lane-track">
+            {% for s in lane.slots %}
+            <a class="slot {{ 'done' if s.a.status in ['atendida','no asistió'] }} {{ 'cancel' if s.a.status == 'cancelada' }}" href="/citas/{{ s.a.id }}"
+               style="left:{{ s.left }}%;width:calc({{ s.width }}% - 3px)" title="{{ s.a.start|fecha('hora') }}–{{ s.a.end|fecha('hora') }} · {{ s.a.patient.full_name }} · {{ s.a.type }} · {{ s.a.status }}">
+              <b>{{ s.a.start|fecha('hora') }}</b><span>{{ s.a.patient.first_name }} {{ s.a.patient.last_name.split()[0] }}</span>
+            </a>
+            {% endfor %}
+            {% if not lane.slots %}<span style="position:absolute;left:10px;top:15px;font-size:12.5px;color:var(--faint)">{{ 'Sin cirugías hoy' if lane.external else 'Sin citas hoy' }}</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% if day.now_pct is not none %}<div class="now-line" data-t="{{ day.now }}" style="left:calc(var(--lane-w) + ({{ day.now_pct }} / 100) * (100% - var(--lane-w) - 18px))"></div>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  {# ---------- gráfica + avisos ---------- #}
+  <section class="card b-7">
+    <div class="card-head">
+      <h2>{{ icon('trend') }}Ingresos y egresos · 6 meses</h2>
+      <div class="day-legend"><span><span class="swatch" style="background:var(--data)"></span>Ingresos</span><span><span class="swatch" style="background:var(--data-2)"></span>Egresos</span></div>
+    </div>
+    <div class="card-body"><div style="height:260px"><canvas id="chartSeries" aria-label="Gráfica de ingresos y egresos"></canvas></div></div>
+  </section>
+
+  <section class="card b-5">
+    <div class="card-head"><h2>{{ icon('bell') }}Avisos para hoy</h2><a class="go" href="/avisos">Todos {{ icon('arrow-right') }}</a></div>
+    <ul class="list">
+      {% for item in notif.reminders[:4] %}
+      <li>
+        <div class="grow">
+          <span class="title">{{ item.r.patient.full_name }}</span>
+          <div class="meta">{{ item.r.kind }} · <span class="{{ 'delta-down' if item.overdue }}">{{ item.r.due_date|rel }}</span></div>
+        </div>
+        <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener" aria-label="Enviar WhatsApp a {{ item.r.patient.full_name }}">{{ icon('message') }} Enviar</a>
+      </li>
+      {% endfor %}
+      {% for item in notif.confirmations[:2] %}
+      <li>
+        <div class="grow">
+          <span class="title">Confirmar a {{ item.a.patient.first_name }} {{ item.a.patient.last_name.split()[0] }}</span>
+          <div class="meta">Mañana {{ item.a.start|fecha('hora') }} · {{ item.a.type }}</div>
+        </div>
+        <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener">{{ icon('message') }} Confirmar</a>
+      </li>
+      {% endfor %}
+      {% if not notif.reminders and not notif.confirmations %}<li><div class="empty grow">Sin mensajes pendientes.</div></li>{% endif %}
+    </ul>
+  </section>
+
+  {# ---------- tratamientos + columna lateral ---------- #}
+  <section class="card b-8">
+    <div class="card-head"><h2>{{ icon('tooth') }}Tratamientos en proceso</h2><span class="muted">{{ active_treatments|length }} activos</span></div>
+    {% if active_treatments %}
+    <div class="table-wrap stack-sm"><table class="table">
+      <thead><tr><th>Paciente</th><th>Tratamiento</th><th class="num">Avance clínico</th><th class="num">Pagado</th><th class="num">Saldo</th></tr></thead>
+      <tbody>
+      {% for t in active_treatments %}
+        <tr>
+          <td><a class="rowlink" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a>
+            {% if vista == 'consultorio' %}<div class="muted" style="font-size:12px">{{ t.doctor.short_name }}</div>{% endif %}</td>
+          <td>{{ t.name }}{% if t.external %} <span class="pill pill-violet">+ maxilofacial</span>{% endif %}</td>
+          <td class="num" data-l="Avance" style="min-width:140px"><div class="row"><div class="progress" style="flex:1"><span style="width:{{ t.progress_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.sessions_done }}/{{ t.sessions_planned }}</small></div></td>
+          <td class="num" data-l="Pagado" style="min-width:120px"><div class="row"><div class="progress blue" style="flex:1"><span style="width:{{ t.paid_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.paid_pct }}%</small></div></td>
+          <td class="num" data-l="Saldo">{{ t.balance|money0 }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<div class="empty">No hay tratamientos en proceso.</div>{% endif %}
+  </section>
+
+  <aside class="stack b-4" aria-label="Pendientes">
+    {% if inv %}
+    <section>
+      <h2 class="rail-head">Depósito dental <a class="go" href="/inventario">Inventario {{ icon('arrow-right') }}</a></h2>
+      <div class="stack" style="gap:8px">
+        {% if inv.expired %}<a href="/inventario?filtro=caducados" class="alert-box alert-bad">{{ icon('alert') }}<span><b>{{ inv.expired|length }} lote{{ 's' if inv.expired|length != 1 }} caducado{{ 's' if inv.expired|length != 1 }}</b> con existencia. Dar de baja.</span></a>{% endif %}
+        {% if inv.expiring %}<a href="/inventario?filtro=caducar" class="alert-box alert-warn">{{ icon('clock') }}<span><b>{{ inv.expiring|length }} por caducar</b> en {{ cfg.EXPIRY_ALERT_DAYS }} días. Primero: {{ inv.expiring[0].product.name }}, {{ inv.expiring[0].expiry_date|rel }}.</span></a>{% endif %}
+        {% if inv.low %}<a href="/inventario?filtro=bajo" class="alert-box alert-info">{{ icon('box') }}<span><b>{{ inv.low|length }} bajo mínimo:</b> {{ inv.low[:2]|map(attribute='name')|join(', ') }}{% if inv.low|length > 2 %} y {{ inv.low|length - 2 }} más{% endif %}.</span></a>{% endif %}
+        {% if not inv.expired and not inv.expiring and not inv.low %}<div class="card empty">Inventario en orden.</div>{% endif %}
+      </div>
+    </section>
+    {% endif %}
+    <section>
+      <h2 class="rail-head">Saldos más altos <a class="go" href="/finanzas?tab=cobrar&vista={{ vista }}">Ver todos {{ icon('arrow-right') }}</a></h2>
+      <div class="card">
+        {% if receivable_items %}
+        <ul class="list">
+          {% for t in receivable_items[:3] %}
+          <li>
+            <div class="grow">
+              <a class="title" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a>
+              <div class="meta">{{ t.name }} · pagado {{ t.paid_pct }}%</div>
+            </div>
+            <b class="tnum" style="font-weight:500">{{ t.balance|money0 }}</b>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}<div class="empty">Sin saldos pendientes.</div>{% endif %}
+      </div>
+    </section>
+    <section>
+      <h2 class="rail-head">Gastos de {{ month_name }} <span class="muted tnum" style="font-weight:400">{{ summary.egresos.total|money0 }}</span></h2>
+      <div class="card">
+        {% if summary.egresos.por_categoria %}
+        <ul class="barlist">
+          {% for cat, val in summary.egresos.por_categoria.items() %}{% if loop.index <= 5 %}
+          <li><span class="bl-name">{{ cat }}</span><span class="bl-val">{{ val|money0 }}</span>
+            <span class="bl-bar"><span style="width:{{ (100 * val / max_cat)|round(1) if max_cat else 0 }}%;animation-delay:{{ loop.index0 * 50 }}ms"></span></span></li>
+          {% endif %}{% endfor %}
+        </ul>
+        {% else %}<div class="empty">Sin gastos registrados este mes.</div>{% endif %}
+      </div>
+    </section>
+  </aside>
+
+  {% if settlement %}
+  <section class="card b-full">
+    <div class="card-head"><h2>{{ icon('wallet') }}Gastos compartidos · quién le debe a quién</h2><span class="muted">{{ month_name|capitalize }}</span></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Doctor</th><th class="num">Pagó</th><th class="num">Le corresponde</th><th class="num">Diferencia</th></tr></thead>
+      <tbody>{% for s in settlement %}
+        <tr><td><span class="row" style="gap:8px"><span class="swatch" style="background:{{ s.user.color }}"></span>{{ s.user.full_name }} <small class="muted">{{ s.user.shared_expense_pct|int }}%</small></span></td>
+          <td class="num">{{ s.pagado|money }}</td><td class="num">{{ s.corresponde|money }}</td>
+          <td class="num" style="color:{{ 'var(--positive)' if s.diferencia > 0 else ('var(--negative)' if s.diferencia < 0 else 'var(--muted)') }}">{{ '+' if s.diferencia > 0 }}{{ s.diferencia|money }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <div class="card-body" style="padding-top:0"><small class="muted">Diferencia positiva: pagó de más y el otro doctor le debe esa cantidad.</small></div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => { const sc = document.querySelector(".day-scroll"), now = document.querySelector(".now-line");
+  if (sc && now && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth * 0.6); })();
+</script>
+<script type="module" src="/static/js/hero3d.js?v=3"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const money = v => (v < 0 ? "-$" : "$") + Math.abs(Number(v)).toLocaleString("es-MX", {maximumFractionDigits: 0});
+Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+const series = {{ chart|tojson }};
+const c = themeColor;
+const chart = new Chart(document.getElementById("chartSeries"), {
+  type: "bar",
+  data: { labels: series.labels, datasets: [
+    { label: "Ingresos", data: series.ingresos, borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
+    { label: "Egresos", data: series.egresos, borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
+  ]},
+  options: {
+    maintainAspectRatio: false,
+    animation: { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700, easing: "easeOutQuart" },
+    interaction: { mode: "index", intersect: false },
+    plugins: { legend: { display: false },
+      tooltip: { padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true, callbacks: { label: x => ` ${x.dataset.label}: ${money(x.raw)}` } } },
+    scales: { y: { ticks: { callback: money, maxTicksLimit: 5 }, border: { display: false } }, x: { grid: { display: false } } }
+  }
+});
+function paintChart() {
+  const [a, b] = chart.data.datasets;
+  a.backgroundColor = c("--data"); a.hoverBackgroundColor = c("--data-ink");
+  b.backgroundColor = c("--data-2"); b.hoverBackgroundColor = c("--data-2-hover");
+  chart.options.color = c("--muted");
+  chart.options.scales.y.ticks.color = c("--muted"); chart.options.scales.x.ticks.color = c("--muted");
+  chart.options.scales.y.grid.color = c("--rule"); chart.options.scales.x.border.color = c("--border");
+  chart.options.plugins.tooltip.backgroundColor = c("--toast"); chart.options.plugins.tooltip.titleColor = c("--toast-ink"); chart.options.plugins.tooltip.bodyColor = c("--toast-ink");
+  chart.update("none");
+}
+paintChart();
+window.addEventListener("themechange", paintChart);
+</script>
+{% endblock %}

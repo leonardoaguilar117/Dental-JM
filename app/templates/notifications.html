@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Avisos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Centro de avisos</h1>
+    <p>Lo que necesitas atender. Los mensajes se envían <b>manualmente</b>: el botón abre WhatsApp con el texto listo y tú decides si lo mandas.</p>
+  </div>
+</div>
+
+<div class="grid g-2">
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('message') }} Recordatorios a pacientes</h2><span class="pill pill-warn">{{ notif.reminders|length }}</span></div>
+    {% if notif.reminders %}
+    <ul class="list">
+      {% for item in notif.reminders %}
+      <li>
+        <div class="grow">
+          <a class="title" href="/pacientes/{{ item.r.patient_id }}" style="color:var(--ink)">{{ item.r.patient.full_name }}</a>
+          <div class="meta">{{ item.r.kind }} · {{ item.r.due_date|fecha }} <span class="{{ 'delta-down' if item.overdue }}">({{ item.r.due_date|rel }})</span> · {{ item.r.patient.phone }}</div>
+        </div>
+        <form id="sent-{{ item.r.id }}" method="post" action="/recordatorios/{{ item.r.id }}/enviado" class="inline-form"><input type="hidden" name="next" value="/avisos"></form>
+        <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener" data-mark-sent="sent-{{ item.r.id }}">{{ icon('message') }} WhatsApp</a>
+        <form method="post" action="/recordatorios/{{ item.r.id }}/descartar" class="inline-form"><input type="hidden" name="next" value="/avisos"><button class="btn btn-xs btn-ghost" title="Descartar" aria-label="Descartar">{{ icon('x') }}</button></form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<div class="empty">Sin recordatorios en los próximos {{ cfg.REMINDER_WINDOW_DAYS }} días.</div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('calendar') }} Confirmar citas de mañana</h2><span class="pill pill-info">{{ notif.confirmations|length }}</span></div>
+    {% if notif.confirmations %}
+    <ul class="list">
+      {% for item in notif.confirmations %}
+      <li>
+        <span class="time-chip">{{ item.a.start|fecha('hora') }}</span>
+        <div class="grow">
+          <a class="title" href="/citas/{{ item.a.id }}" style="color:var(--ink)">{{ item.a.patient.full_name }}</a>
+          <div class="meta">{{ item.a.type }}{% if item.a.external %} · con {{ item.a.external.full_name }}{% endif %}</div>
+        </div>
+        <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener">{{ icon('message') }} Enviar</a>
+        <form method="post" action="/citas/{{ item.a.id }}/estado" class="inline-form">
+          <input type="hidden" name="status" value="confirmada"><input type="hidden" name="next" value="/avisos">
+          <button class="btn btn-xs" title="Marcar confirmada">{{ icon('check') }} Confirmada</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<div class="empty">No hay citas por confirmar para mañana.</div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('wallet') }} Saldos sin abono en 30+ días</h2><span class="pill">{{ notif.debts|length }}</span></div>
+    {% if notif.debts %}
+    <ul class="list">
+      {% for item in notif.debts %}
+      <li>
+        <div class="grow">
+          <a class="title" href="/pacientes/{{ item.t.patient_id }}#tratamientos" style="color:var(--ink)">{{ item.t.patient.full_name }}</a>
+          <div class="meta">{{ item.t.name }} · último abono hace {{ item.days }} días</div>
+        </div>
+        <b class="tnum">{{ item.t.balance|money0 }}</b>
+        <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener">{{ icon('message') }} Recordar</a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<div class="empty">Ningún saldo atrasado.</div>{% endif %}
+  </div>
+
+  {% if user.can_inventory %}
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('box') }} Depósito dental</h2><a class="btn btn-xs btn-ghost" href="/inventario">Abrir inventario</a></div>
+    <ul class="list">
+      {% for l in notif.inventory.expired %}
+      <li><span class="pill pill-bad">Caducado</span><div class="grow"><a class="title" href="/inventario/producto/{{ l.product_id }}" style="color:var(--ink)">{{ l.product.name }}</a><div class="meta">Lote {{ l.lot_code }} · {{ l.quantity|qty }} {{ l.product.unit }} · venció {{ l.expiry_date|rel }}</div></div></li>
+      {% endfor %}
+      {% for l in notif.inventory.expiring %}
+      <li><span class="pill pill-warn">Por caducar</span><div class="grow"><a class="title" href="/inventario/producto/{{ l.product_id }}" style="color:var(--ink)">{{ l.product.name }}</a><div class="meta">Lote {{ l.lot_code }} · {{ l.quantity|qty }} {{ l.product.unit }} · caduca {{ l.expiry_date|fecha }} ({{ l.expiry_date|rel }})</div></div></li>
+      {% endfor %}
+      {% for p in notif.inventory.low %}
+      <li><span class="pill pill-info">Stock bajo</span><div class="grow"><a class="title" href="/inventario/producto/{{ p.id }}" style="color:var(--ink)">{{ p.name }}</a><div class="meta">Existencia {{ p.stock }} · mínimo {{ p.min_stock|round(0)|int }} {{ p.unit }}</div></div></li>
+      {% endfor %}
+      {% if not notif.inventory.expired and not notif.inventory.expiring and not notif.inventory.low %}<li><div class="empty grow">Inventario en orden.</div></li>{% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

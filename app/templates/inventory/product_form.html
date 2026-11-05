@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Nuevo producto{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Nuevo producto</h1><p>Agrega un artículo al depósito. Si caduca, cada entrada pedirá lote y fecha de caducidad.</p></div></div>
+<form method="post" class="card card-pad" style="max-width:900px">
+  {% include "inventory/_product_fields.html" %}
+  <hr class="section-sep">
+  <fieldset>
+    <legend>Existencia inicial (opcional)</legend>
+    <div class="form-grid-3">
+      <div class="field"><label>Cantidad</label><input type="number" step="0.01" min="0" name="initial_qty" value="0"></div>
+      <div class="field"><label>Lote</label><input type="text" name="lot_code" placeholder="Ej. L24519"></div>
+      <div class="field"><label>Caducidad</label><input type="date" name="expiry_date"></div>
+    </div>
+  </fieldset>
+  <div class="actions"><button class="btn btn-primary">Guardar producto</button><a class="btn" href="/inventario">Cancelar</a></div>
+</form>
+{% endblock %}

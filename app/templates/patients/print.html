@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Historia clínica · {{ p.full_name }}{% endblock %}
+{% block topactions %}<button class="btn btn-sm btn-primary" onclick="window.print()">{{ icon('printer') }} Imprimir / guardar PDF</button>{% endblock %}
+{% block content %}
+<div class="print-sheet">
+  <div class="doc-head">
+    <div><h1>Historia clínica odontológica</h1><small class="muted">Consultorio Dental JM · Expediente #{{ '%05d'|format(p.id) }}</small></div>
+    <div style="text-align:right"><b>{{ p.primary_doctor.full_name if p.primary_doctor }}</b><br><small class="muted">{{ p.primary_doctor.specialty if p.primary_doctor }}</small><br><small class="muted">Impreso: {{ today()|fecha }}</small></div>
+  </div>
+  <h3>Ficha de identificación</h3>
+  <dl>
+    <dt>Nombre</dt><dd>{{ p.full_name }}</dd>
+    <dt>Fecha de nacimiento / edad</dt><dd>{{ p.birth_date|fecha }} · {{ p.age }} años</dd>
+    <dt>Sexo</dt><dd>{{ p.sex or '—' }}</dd>
+    <dt>Ocupación</dt><dd>{{ p.occupation or '—' }}</dd>
+    <dt>Domicilio</dt><dd>{{ p.address or '—' }}</dd>
+    <dt>Teléfono / correo</dt><dd>{{ p.phone or '—' }} · {{ p.email or '—' }}</dd>
+    {% if p.emergency_contact %}<dt>Contacto de emergencia</dt><dd>{{ p.emergency_contact }}</dd>{% endif %}
+  </dl>
+  <h3>Interrogatorio</h3>
+  <dl>
+    <dt>Motivo de consulta</dt><dd>{{ h.motivo_consulta or '—' }}</dd>
+    <dt>Padecimiento actual</dt><dd>{{ h.padecimiento_actual or '—' }}</dd>
+    <dt>Heredofamiliares</dt><dd>{{ h.antecedentes_heredofamiliares or '—' }}</dd>
+    <dt>Personales patológicos</dt><dd>{{ h.antecedentes_patologicos or '—' }}</dd>
+    <dt>No patológicos</dt><dd>{{ h.antecedentes_no_patologicos or '—' }}</dd>
+    <dt>Alergias</dt><dd>{{ h.alergias or '—' }}</dd>
+    <dt>Medicamentos</dt><dd>{{ h.medicamentos or '—' }}</dd>
+    <dt>Condiciones sistémicas</dt><dd>{% set c = [] %}{% for k,l in [('diabetes','Diabetes'),('hipertension','Hipertensión'),('cardiopatia','Cardiopatía'),('coagulacion','Coagulopatía'),('embarazo','Embarazo'),('fumador','Tabaquismo'),('bruxismo','Bruxismo')] %}{% if h[k] %}{% set _ = c.append(l) %}{% endif %}{% endfor %}{{ c|join(', ') or 'Ninguna referida' }}</dd>
+    <dt>Presión arterial</dt><dd>{{ h.presion_arterial or '—' }}</dd>
+  </dl>
+  <h3>Exploración</h3>
+  <dl>
+    <dt>Extraoral</dt><dd>{{ h.exploracion_extraoral or '—' }}</dd>
+    <dt>Intraoral</dt><dd>{{ h.exploracion_intraoral or '—' }}</dd>
+    <dt>Higiene / oclusión</dt><dd>{{ h.higiene_oral or '—' }} · {{ h.oclusion or '—' }}</dd>
+  </dl>
+  <h3>Odontograma</h3>
+  {% with readonly=True %}{% include "patients/_odontogram.html" %}{% endwith %}
+  <h3>Diagnóstico, plan y pronóstico</h3>
+  <dl>
+    <dt>Diagnóstico</dt><dd>{{ h.diagnostico or '—' }}</dd>
+    <dt>Plan de tratamiento</dt><dd>{{ h.plan_tratamiento or '—' }}</dd>
+    <dt>Pronóstico</dt><dd>{{ h.pronostico or '—' }}</dd>
+    <dt>Consentimiento informado</dt><dd>{{ 'Firmado' if h.consentimiento_firmado else 'Pendiente' }}</dd>
+  </dl>
+  {% if p.notes_list %}
+  <h3>Notas de evolución</h3>
+  <table class="table"><thead><tr><th>Fecha</th><th>Procedimiento</th><th>Nota</th><th>Doctor</th></tr></thead><tbody>
+  {% for n in p.notes_list[:15] %}<tr><td>{{ n.date|fecha }}</td><td>{{ n.procedure }}</td><td>{{ n.note }}</td><td>{{ n.doctor.short_name }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+  <div class="signature"><div>Firma del paciente o tutor</div><div>{{ p.primary_doctor.full_name if p.primary_doctor }}<br>Céd. prof. ________</div></div>
+</div>
+{% endblock %}
