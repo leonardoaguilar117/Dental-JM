@@ -1,9 +1,9 @@
 """Cálculo de ingresos, egresos y cuentas por cobrar.
 
 Reglas:
-- Ingreso de un doctor = abonos de sus tratamientos + ventas del depósito (si tiene inventario).
-- Egreso de un doctor = gastos propios + (gastos compartidos × su % de reparto).
-- Vista "consultorio" (user=None) = todo sumado.
+- Ingreso de un doctor = abonos de sus tratamientos + ventas del depósito (solo quien lo administra).
+- Egreso de un doctor = gastos propios (incluye compras al depósito) + (gastos compartidos × su % de reparto).
+- Cada doctor solo consulta sus propios números; no hay vista combinada.
 """
 from __future__ import annotations
 
@@ -122,3 +122,24 @@ def shared_settlement(db: Session, year: int, month: int) -> list[dict]:
         due = total * (u.shared_expense_pct or 0) / 100
         out.append({"user": u, "pagado": paid, "corresponde": due, "diferencia": paid - due})
     return out
+
+
+def sales_tickets(db: Session, user: User, start: date, end: date) -> list[dict]:
+    """Ventas del depósito del doctor agrupadas por nota (las antiguas sin folio quedan una por movimiento)."""
+    rows = db.scalars(
+        select(Movement).join(Product).where(
+            Product.owner_id == user.id, Movement.kind == "venta",
+            Movement.date >= datetime.combine(start, datetime.min.time()),
+            Movement.date < datetime.combine(end, datetime.min.time()),
+        ).order_by(Movement.date.desc(), Movement.id)
+    ).all()
+    groups: dict[str, dict] = {}
+    for m in rows:
+        key = m.ticket or f"M{m.id}"
+        g = groups.setdefault(key, {"ticket": m.ticket, "code": m.ticket or f"V-{m.id:05d}", "date": m.date,
+                                    "method": m.method, "customer": m.customer_label, "lines": [],
+                                    "total": 0.0, "cost": 0.0})
+        g["lines"].append(m)
+        g["total"] += m.total
+        g["cost"] += abs(m.quantity) * (m.lot.unit_cost if m.lot else m.product.cost_price)
+    return list(groups.values())

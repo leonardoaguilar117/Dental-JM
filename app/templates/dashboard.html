@@ -15,7 +15,7 @@
   {# ---------- héroe: saludo + hallazgo + escena 3D ---------- #}
   <section class="hero b-hero" aria-label="Resumen del día">
     <div class="hero-text">
-      <h1 style="view-transition-name: page-title">{{ 'Consultorio' if vista == 'consultorio' else user.short_name }} · {{ month_name|capitalize }}</h1>
+      <h1 style="view-transition-name: page-title">{{ user.short_name }} · {{ month_name|capitalize }}</h1>
       {% if finding %}
       <p class="finding">Hoy: {% for f in finding %}<b>{{ f }}</b>{{ ' · ' if not loop.last }}{% endfor %}.</p>
       {% else %}<p class="finding">Todo al día: sin pendientes urgentes.</p>{% endif %}
@@ -24,14 +24,10 @@
         <a class="btn btn-sm btn-wa" href="/avisos">{{ icon('message') }} Enviar recordatorios</a>
       </div>
       <div class="controls">
-        <div class="seg" role="tablist" aria-label="Alcance">
-          <a href="/?vista=mia&mes={{ mes_qs }}" class="{{ 'active' if vista != 'consultorio' }}">Mis números</a>
-          <a href="/?vista=consultorio&mes={{ mes_qs }}" class="{{ 'active' if vista == 'consultorio' }}">Consultorio</a>
-        </div>
         <div class="month-nav">
-          <a href="/?vista={{ vista }}&mes={{ prev_mes }}" aria-label="Mes anterior">{{ icon('chev-left') }}</a>
+          <a href="/?mes={{ prev_mes }}" aria-label="Mes anterior">{{ icon('chev-left') }}</a>
           <span>{{ month_name }} {{ year }}</span>
-          <a href="/?vista={{ vista }}&mes={{ next_mes }}" aria-label="Mes siguiente">{{ icon('chev-right') }}</a>
+          <a href="/?mes={{ next_mes }}" aria-label="Mes siguiente">{{ icon('chev-right') }}</a>
         </div>
       </div>
     </div>
@@ -62,7 +58,7 @@
       <div>
         <span class="kpi-label">Por cobrar</span>
         <span class="kpi-value" data-count="{{ receivable_total }}" data-money>{{ receivable_total|money0 }}</span>
-        <span class="kpi-sub"><a class="go" href="/finanzas?tab=cobrar&vista={{ vista }}">{{ receivable_items|length }}{{ '+' if receivable_items|length >= 6 }} saldos abiertos {{ icon('arrow-right') }}</a></span>
+        <span class="kpi-sub"><a class="go" href="/finanzas?tab=cobrar">{{ receivable_items|length }}{{ '+' if receivable_items|length >= 6 }} saldos abiertos {{ icon('arrow-right') }}</a></span>
       </div>
     </div>
   </section>
@@ -89,7 +85,7 @@
               <b>{{ s.a.start|fecha('hora') }}</b><span>{{ s.a.patient.first_name }} {{ s.a.patient.last_name.split()[0] }}</span>
             </a>
             {% endfor %}
-            {% if not lane.slots %}<span style="position:absolute;left:10px;top:15px;font-size:12.5px;color:var(--faint)">{{ 'Sin cirugías hoy' if lane.external else 'Sin citas hoy' }}</span>{% endif %}
+            {% if not lane.slots %}<span style="position:absolute;left:10px;top:15px;font-size:12.5px;color:var(--faint)">Sin citas hoy</span>{% endif %}
           </div>
         </div>
         {% endfor %}
@@ -142,8 +138,8 @@
       {% for t in active_treatments %}
         <tr>
           <td><a class="rowlink" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a>
-            {% if vista == 'consultorio' %}<div class="muted" style="font-size:12px">{{ t.doctor.short_name }}</div>{% endif %}</td>
-          <td>{{ t.name }}{% if t.external %} <span class="pill pill-violet">+ maxilofacial</span>{% endif %}</td>
+</td>
+          <td>{{ t.name }}</td>
           <td class="num" data-l="Avance" style="min-width:140px"><div class="row"><div class="progress" style="flex:1"><span style="width:{{ t.progress_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.sessions_done }}/{{ t.sessions_planned }}</small></div></td>
           <td class="num" data-l="Pagado" style="min-width:120px"><div class="row"><div class="progress blue" style="flex:1"><span style="width:{{ t.paid_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.paid_pct }}%</small></div></td>
           <td class="num" data-l="Saldo">{{ t.balance|money0 }}</td>
@@ -167,7 +163,7 @@
     </section>
     {% endif %}
     <section>
-      <h2 class="rail-head">Saldos más altos <a class="go" href="/finanzas?tab=cobrar&vista={{ vista }}">Ver todos {{ icon('arrow-right') }}</a></h2>
+      <h2 class="rail-head">Saldos más altos <a class="go" href="/finanzas?tab=cobrar">Ver todos {{ icon('arrow-right') }}</a></h2>
       <div class="card">
         {% if receivable_items %}
         <ul class="list">
@@ -178,6 +174,7 @@
               <div class="meta">{{ t.name }} · pagado {{ t.paid_pct }}%</div>
             </div>
             <b class="tnum" style="font-weight:500">{{ t.balance|money0 }}</b>
+            {% if t.doctor_id == user.id %}<a class="btn btn-xs btn-primary" href="/pacientes/{{ t.patient_id }}?cobrar={{ t.id }}">Cobrar</a>{% endif %}
           </li>
           {% endfor %}
         </ul>
@@ -210,7 +207,6 @@
           <td class="num" style="color:{{ 'var(--positive)' if s.diferencia > 0 else ('var(--negative)' if s.diferencia < 0 else 'var(--muted)') }}">{{ '+' if s.diferencia > 0 }}{{ s.diferencia|money }}</td></tr>
       {% endfor %}</tbody>
     </table></div>
-    <div class="card-body" style="padding-top:0"><small class="muted">Diferencia positiva: pagó de más y el otro doctor le debe esa cantidad.</small></div>
   </section>
   {% endif %}
 </div>
@@ -232,8 +228,8 @@ const c = themeColor;
 const chart = new Chart(document.getElementById("chartSeries"), {
   type: "bar",
   data: { labels: series.labels, datasets: [
-    { label: "Ingresos", data: series.ingresos, borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
-    { label: "Egresos", data: series.egresos, borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
+    { label: "Ingresos", data: series.ingresos, backgroundColor: c("--data"), borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
+    { label: "Egresos", data: series.egresos, backgroundColor: c("--data-2"), borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
   ]},
   options: {
     maintainAspectRatio: false,

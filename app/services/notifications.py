@@ -21,9 +21,8 @@ def reminder_message(r: Reminder) -> str:
 
 
 def confirmation_message(a: Appointment) -> str:
-    extra = f" junto con {a.external.full_name}" if a.external else ""
     return (f"Hola {a.patient.first_name}, te recordamos tu cita de {a.type.lower()} con "
-            f"{a.doctor.short_name}{extra} el {fecha(a.start, 'larga')} a las {a.start:%H:%M} hrs. "
+            f"{a.doctor.short_name} el {fecha(a.start, 'larga')} a las {a.start:%H:%M} hrs. "
             f"Por favor confírmanos tu asistencia. ¡Gracias!")
 
 
@@ -87,3 +86,10 @@ def count_only(db: Session, user: User) -> int:
         return build(db, user)["count"]
     except Exception:  # nunca romper la navegación por el contador
         return 0
+
+
+def payment_message(pay) -> str:
+    t = pay.treatment
+    rest = (f"Saldo pendiente: ${t.balance:,.2f}." if t.balance > 0 else "Tu tratamiento quedó liquidado.")
+    return (f"Hola {pay.patient.first_name}, recibimos tu pago de ${pay.amount:,.2f} ({pay.method.lower()}) "
+            f"por {t.name.lower()} el {fecha(pay.date)}. {rest} ¡Gracias! — {pay.doctor.short_name}, Consultorio Dental JM")

@@ -34,6 +34,8 @@
     <dt>Extraoral</dt><dd>{{ h.exploracion_extraoral or '—' }}</dd>
     <dt>Intraoral</dt><dd>{{ h.exploracion_intraoral or '—' }}</dd>
     <dt>Higiene / oclusión</dt><dd>{{ h.higiene_oral or '—' }} · {{ h.oclusion or '—' }}</dd>
+    <dt>Lengua</dt><dd>{{ h.lengua_list|join(', ') or 'Sin afectaciones' }}{% if h.lengua_notas %}. {{ h.lengua_notas }}{% endif %}</dd>
+    <dt>Encía y periodonto</dt><dd>{{ h.encia_list|join(', ') or 'Sin afectaciones' }}{% if h.encia_notas %}. {{ h.encia_notas }}{% endif %}</dd>
   </dl>
   <h3>Odontograma</h3>
   {% with readonly=True %}{% include "patients/_odontogram.html" %}{% endwith %}
@@ -42,7 +44,7 @@
     <dt>Diagnóstico</dt><dd>{{ h.diagnostico or '—' }}</dd>
     <dt>Plan de tratamiento</dt><dd>{{ h.plan_tratamiento or '—' }}</dd>
     <dt>Pronóstico</dt><dd>{{ h.pronostico or '—' }}</dd>
-    <dt>Consentimiento informado</dt><dd>{{ 'Firmado' if h.consentimiento_firmado else 'Pendiente' }}</dd>
+    <dt>Consentimiento informado</dt><dd>{% if h.consentimiento_firmado %}Firmado{% if h.consentimiento_fecha %} el {{ h.consentimiento_fecha|fecha('fechahora') }}{% endif %}{% if h.consentimiento_nombre %} por {{ h.consentimiento_nombre }}{% endif %}{% else %}Pendiente{% endif %}</dd>
   </dl>
   {% if p.notes_list %}
   <h3>Notas de evolución</h3>
@@ -50,6 +52,6 @@
   {% for n in p.notes_list[:15] %}<tr><td>{{ n.date|fecha }}</td><td>{{ n.procedure }}</td><td>{{ n.note }}</td><td>{{ n.doctor.short_name }}</td></tr>{% endfor %}
   </tbody></table>
   {% endif %}
-  <div class="signature"><div>Firma del paciente o tutor</div><div>{{ p.primary_doctor.full_name if p.primary_doctor }}<br>Céd. prof. ________</div></div>
+  <div class="signature"><div>{% if h.consentimiento_firma %}<img class="sig-img" src="{{ h.consentimiento_firma }}" alt="Firma"><br>{{ h.consentimiento_nombre }}<br>{% endif %}Firma del paciente o tutor</div><div>{{ p.primary_doctor.full_name if p.primary_doctor }}<br>Céd. prof. ________</div></div>
 </div>
 {% endblock %}

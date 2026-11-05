@@ -4,15 +4,23 @@
 {% block content %}
 <div class="page-head">
   <div>
-    <div class="row wrap" style="gap:10px"><h1>{{ a.type }}</h1>{{ status_pill(a.status) }}{% if a.external %}<span class="pill pill-violet">{{ icon('scalpel') }} Con {{ a.external.full_name }}</span>{% endif %}</div>
+    <div class="row wrap" style="gap:10px"><h1>{{ a.type }}</h1>{{ status_pill(a.status) }}</div>
     <p>{{ a.start|fecha('larga')|capitalize }} · {{ a.start|fecha('hora') }}–{{ a.end|fecha('hora') }} · {{ a.doctor.full_name }}</p>
   </div>
   <div class="actions">
     <a class="btn btn-wa" href="{{ wa_confirm }}" target="_blank" rel="noopener">{{ icon('message') }} Enviar confirmación</a>
-    <a class="btn" href="{{ gcal_link }}" target="_blank" rel="noopener">{{ icon('google') }} Añadir a Google Calendar</a>
+    {% if gcal_synced %}<span class="pill pill-ok">{{ icon('google') }} En tu Google Calendar</span>
+    {% elif not just_created %}<a class="btn" href="{{ gcal_link }}" target="_blank" rel="noopener">{{ icon('google') }} Agregar a Google Calendar</a>{% endif %}
   </div>
 </div>
 
+{% if just_created %}
+<div class="gcal-cta card card-pad mb">
+  <span class="gcal-ic">{{ icon('google') }}</span>
+  <div class="grow"><b>Agrégala a tu Google Calendar</b><div class="muted">{{ a.patient.full_name }} · {{ a.start|fecha('diames') }} · {{ a.start|fecha('hora') }}</div></div>
+  <a class="btn btn-primary" href="{{ gcal_link }}" target="_blank" rel="noopener">{{ icon('google') }} Agregar</a>
+</div>
+{% endif %}
 <div class="grid g-main">
   <div class="stack">
     {% if a.status not in ['atendida', 'cancelada'] %}
@@ -48,7 +56,6 @@
           <div class="field"><label>Duración</label><select name="duration">{% for m in [15,30,45,60,90,120,180] %}<option value="{{ m }}" {{ 'selected' if a.duration_min == m }}>{{ m }} min</option>{% endfor %}</select></div>
           <div class="field"><label>Doctor(a)</label><select name="doctor_id">{% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if a.doctor_id == d.id }}>{{ d.full_name }}</option>{% endfor %}</select></div>
           <div class="field"><label>Tipo</label><select name="type">{% for t in types %}<option {{ 'selected' if a.type == t }}>{{ t }}</option>{% endfor %}</select></div>
-          <div class="field span-2"><label>Especialista externo</label><select name="external_id"><option value="">No requiere</option>{% for e in externals %}<option value="{{ e.id }}" {{ 'selected' if a.external_id == e.id }}>{{ e.full_name }}</option>{% endfor %}</select></div>
           <div class="field span-2"><label>Notas</label><textarea name="notes">{{ a.notes }}</textarea></div>
         </div>
         <label class="check mb"><input type="checkbox" name="force" value="1"> Ignorar conflictos de horario</label>
@@ -64,7 +71,10 @@
         <div class="row">{{ avatar(a.patient.initials, a.doctor.color) }}<div><b>{{ a.patient.full_name }}</b><div class="muted">{{ a.patient.phone }} · {{ a.patient.age }} años</div></div></div>
         {% if a.patient.history and a.patient.history.alert_flags %}
         <div class="alert-box alert-bad mt">{{ icon('alert') }}<span>{{ a.patient.history.alert_flags|join(' · ') }}</span></div>{% endif %}
-        {% if a.patient.balance > 0 %}<div class="alert-box alert-info mt">{{ icon('wallet') }}<span>Saldo pendiente: <b>{{ a.patient.balance|money }}</b></span></div>{% endif %}
+        {% set mybal = a.patient.balance_for(user.id) %}<div class="debt-box mt {{ 'owes' if mybal > 0 else 'clear' }}">
+          <div class="debt-main"><small>{{ 'Te debe' if mybal > 0 else 'Al corriente contigo' }}</small><b class="tnum">{{ mybal|money }}</b></div>
+          <a class="btn btn-primary debt-btn" href="/pacientes/{{ a.patient_id }}?cobrar=1">{{ icon('wallet') }} Cobrar</a>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -77,14 +87,6 @@
         {% endfor %}
       </div>
     </div>
-    {% if a.external %}
-    <div class="card card-pad">
-      <h3>{{ icon('scalpel') }} {{ a.external.full_name }}</h3>
-      <p class="muted" style="margin:6px 0">{{ a.external.specialty }} · {{ a.external.phone }}</p>
-      {% if a.external.availability_note %}<small class="muted">{{ a.external.availability_note }}</small>{% endif %}
-      <a class="btn btn-sm btn-wa mt" target="_blank" rel="noopener" href="{{ wa(a.external.phone, 'Hola Dr., le confirmo la cirugía de ' ~ a.patient.full_name ~ ' el ' ~ (a.start|fecha('larga')) ~ ' a las ' ~ (a.start|fecha('hora')) ~ ' hrs en el Consultorio JM (' ~ a.doctor.short_name ~ '). ' ~ a.notes) }}">{{ icon('message') }} Avisar al especialista</a>
-    </div>
-    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Nota de venta {{ tk.code }}{% endblock %}
+{% block topactions %}<a class="btn btn-sm" href="/inventario/ventas">{{ icon('chev-left') }} Ventas</a><button class="btn btn-sm btn-primary" onclick="window.print()">{{ icon('printer') }} Imprimir</button>{% endblock %}
+{% block content %}
+<div class="print-sheet" style="max-width:560px">
+  <div class="doc-head">
+    <div><h1>Nota de venta</h1><small class="muted">Folio {{ tk.code }} · Comprobante simple (no fiscal)</small></div>
+    <div style="text-align:right"><b>Consultorio Dental JM</b><br><small class="muted">{{ tk.date|fecha('larga') }}</small></div>
+  </div>
+  <dl>
+    <dt>Cliente</dt><dd>{{ tk.customer }}</dd>
+    <dt>Forma de pago</dt><dd>{{ tk.method or '—' }}</dd>
+    <dt>Vendió</dt><dd>{{ user.full_name }}</dd>
+  </dl>
+  <table class="table mt">
+    <thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Importe</th></tr></thead>
+    <tbody>{% for m in tk.lines %}<tr><td>{{ m.product.name }}</td><td class="num">{{ (-m.quantity)|qty }} {{ m.product.unit }}</td><td class="num">{{ m.unit_price|money }}</td><td class="num">{{ m.total|money }}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><td colspan="3" class="num"><b>Total</b></td><td class="num"><b style="font-size:18px">{{ tk.total|money }}</b></td></tr></tfoot>
+  </table>
+  <div class="receipt-status ok"><b>Pagado</b> · {{ tk.total|money }}</div>
+</div>
+{% endblock %}

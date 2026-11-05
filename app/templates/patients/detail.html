@@ -2,13 +2,14 @@
 {% from "_icons.html" import status_pill %}
 {% block title %}{{ p.full_name }}{% endblock %}
 {% block content %}
+{% include "patients/_charge.html" %}
 <div class="card mb">
   <div class="p-head">
     <span style="display:inline-block;view-transition-name: pav-{{ p.id }}">{{ avatar(p.initials, p.primary_doctor.color if p.primary_doctor else '#64748b', 'avatar-lg') }}</span>
     <div class="grow">
       <div class="row wrap" style="gap:8px"><h1 style="view-transition-name: pname-{{ p.id }}">{{ p.full_name }}</h1>
         {% for f in h.alert_flags %}<span class="pill pill-bad">{{ icon('alert') }} {{ f }}</span>{% endfor %}
-        {% if not h.consentimiento_firmado %}<span class="pill pill-warn">Falta consentimiento informado</span>{% endif %}
+        {% if not h.consentimiento_firmado %}<a class="pill pill-warn" href="#historia" data-tab="historia" data-scroll="#consentimiento">Falta consentimiento informado</a>{% endif %}
       </div>
       <div class="p-facts">
         <span><b>{{ p.age if p.age is not none else '—' }}</b> años</span>
@@ -18,15 +19,18 @@
         <span>Tratante: <b>{{ p.primary_doctor.short_name if p.primary_doctor else '—' }}</b></span>
       </div>
     </div>
-    <div class="money-strip">
-      {% set tot = p.treatments|rejectattr('status','equalto','cancelado')|sum(attribute='net_total') %}
-      <div><small class="muted">Presupuestado</small><b>{{ tot|money0 }}</b></div>
-      <div><small class="muted">Pagado</small><b style="color:var(--ok)">{{ (tot - p.balance)|money0 }}</b></div>
-      <div><small class="muted">Saldo</small><b style="color:{{ 'var(--bad)' if p.balance > 0 else 'var(--ink)' }}">{{ p.balance|money0 }}</b></div>
+    {% set tot = p.total_for(user.id) %}{% set mybal = p.balance_for(user.id) %}
+    <div class="debt-box {{ 'owes' if mybal > 0 else 'clear' }}">
+      <div class="debt-main">
+        <small>{{ 'Te debe' if mybal > 0 else 'Al corriente contigo' }}</small>
+        <b class="tnum">{{ mybal|money }}</b>
+        {% if tot %}<span class="debt-sub">Pagado {{ (tot - mybal)|money0 }} de {{ tot|money0 }}</span>{% endif %}
+      </div>
+      <button type="button" class="btn btn-primary debt-btn" data-charge-open>{{ icon('wallet') }} {{ 'Cobrar' if mybal > 0 else 'Registrar cobro' }}</button>
     </div>
   </div>
   <div class="card-body row wrap" style="border-top:1px solid var(--line);gap:8px">
-    <a class="btn btn-sm btn-primary" href="/citas/nueva?paciente={{ p.id }}">{{ icon('calendar') }} Agendar cita</a>
+    <a class="btn btn-sm" href="/citas/nueva?paciente={{ p.id }}">{{ icon('calendar') }} Agendar cita</a>
     {% if p.phone %}<a class="btn btn-sm btn-wa" href="{{ wa(p.phone, 'Hola ' ~ p.first_name ~ ', te saludamos del Consultorio Dental JM.') }}" target="_blank" rel="noopener">{{ icon('message') }} WhatsApp</a>{% endif %}
     <a class="btn btn-sm" href="/pacientes/{{ p.id }}/historia/imprimir" target="_blank">{{ icon('printer') }} Imprimir historia clínica</a>
     <a class="btn btn-sm" href="/pacientes/{{ p.id }}/editar">{{ icon('edit') }} Editar ficha</a>
@@ -35,6 +39,18 @@
   </div>
 </div>
 
+{% if last_pay %}
+{% set lb = last_pay.treatment.balance %}
+<div class="paid-banner card mb">
+  <span class="paid-ic">{{ icon('check') }}</span>
+  <div class="grow"><b>Cobrado {{ last_pay.amount|money }}</b> · {{ last_pay.treatment.name }} · {{ last_pay.method }}
+    <div class="{{ 'owe' if lb > 0 else 'ok' }}">{{ 'Queda a deber ' ~ (lb|money) if lb > 0 else 'Tratamiento liquidado' }}</div></div>
+  <div class="row wrap" style="gap:8px">
+    <a class="btn btn-sm" href="/pagos/{{ last_pay.id }}/recibo" target="_blank">{{ icon('printer') }} Recibo</a>
+    {% if p.phone %}<a class="btn btn-sm btn-wa" href="{{ paid_wa }}" target="_blank" rel="noopener">{{ icon('message') }} Enviar al paciente</a>{% endif %}
+  </div>
+</div>
+{% endif %}
 <div class="tabs">
   <a href="#resumen" data-tab="resumen">{{ icon('cube') }} Resumen</a>
   <a href="#historia" data-tab="historia">{{ icon('file') }} Historia clínica</a>
@@ -62,9 +78,9 @@
             <a class="go" href="#historia" data-tab="historia">Editar odontograma {{ icon('arrow-right') }}</a></div>
         </div>
         <div class="typo">
-          <div class="scene" data-typodont data-list="#zone-list" data-odonto='{{ h.odontograma_json }}' data-states='{{ tooth_states_json }}'>
+          <div class="scene" data-typodont data-list="#zone-list" data-odonto='{{ h.odontograma_json }}' data-states='{{ tooth_states_json }}' data-encia='{{ h.encia_list|tojson }}'>
             <div class="scene-skeleton"></div>
-            <span class="scene-hint">{{ icon('rotate') }} Arrastra para girar · elige una pieza para verla de cerca</span>
+            <span class="scene-hint">Arrastra para girar · clic derecho o dos dedos para mover · rueda para acercar</span>
           </div>
           <div class="typo-side">
             <h3>Piezas por zona</h3>
@@ -104,13 +120,24 @@
           <p class="muted" style="margin:0">Última actualización: {{ h.updated_at|fecha('fechahora') }}{% if h.updated_by %} por {{ h.updated_by.short_name }}{% endif %}</p>
         </div>
       </div>
+      <div class="card">
+        <div class="card-head"><h2>Lengua y encía</h2><a class="btn btn-xs btn-ghost" href="#historia" data-tab="historia">Editar</a></div>
+        <div class="card-body soft-tissue">
+          <div><small class="muted">Lengua</small>
+            <div class="row wrap" style="gap:6px;margin-top:4px">{% for x in h.lengua_list %}<span class="pill pill-warn">{{ x }}</span>{% else %}<span class="pill pill-ok">Sin afectaciones</span>{% endfor %}</div>
+            {% if h.lengua_notas %}<p class="muted" style="margin:6px 0 0">{{ h.lengua_notas }}</p>{% endif %}</div>
+          <div><small class="muted">Encía y periodonto</small>
+            <div class="row wrap" style="gap:6px;margin-top:4px">{% for x in h.encia_list %}<span class="pill pill-bad">{{ x }}</span>{% else %}<span class="pill pill-ok">Sin afectaciones</span>{% endfor %}</div>
+            {% if h.encia_notas %}<p class="muted" style="margin:6px 0 0">{{ h.encia_notas }}</p>{% endif %}</div>
+        </div>
+      </div>
     </div>
     <div class="stack">
       <div class="card">
         <div class="card-head"><h2>Próximas citas</h2></div>
         {% set upcoming = p.appointments|selectattr('status','in',['programada','confirmada'])|list|reverse|list %}
         {% if upcoming %}<ul class="list">{% for a in upcoming[:4] %}
-          <li><div class="grow"><a class="title" href="/citas/{{ a.id }}" style="color:var(--ink)">{{ a.start|fecha('diames') }} · {{ a.start|fecha('hora') }}</a><div class="meta">{{ a.type }} · {{ a.doctor.short_name }}{% if a.external %} + {{ a.external.full_name }}{% endif %}</div></div>{{ status_pill(a.status) }}</li>
+          <li><div class="grow"><a class="title" href="/citas/{{ a.id }}" style="color:var(--ink)">{{ a.start|fecha('diames') }} · {{ a.start|fecha('hora') }}</a><div class="meta">{{ a.type }} · {{ a.doctor.short_name }}</div></div>{{ status_pill(a.status) }}</li>
         {% endfor %}</ul>{% else %}<div class="empty">Sin citas próximas.</div>{% endif %}
       </div>
       <div class="card">
@@ -167,8 +194,25 @@
     </fieldset>
     <hr class="section-sep">
     <fieldset>
+      <legend>Lengua y encía</legend>
+      
+      <div class="form-grid">
+        <div class="field">
+          <label>Lengua</label>
+          <div class="chips-check">{% for o in cfg.LENGUA_OPCIONES %}<label><input type="checkbox" name="lengua" value="{{ o }}" {{ 'checked' if o in h.lengua_list }}><span>{{ o }}</span></label>{% endfor %}</div>
+          <textarea name="lengua_notas" placeholder="Localización, extensión, síntomas (ardor, dolor)…">{{ h.lengua_notas }}</textarea>
+        </div>
+        <div class="field">
+          <label>Encía y periodonto</label>
+          <div class="chips-check">{% for o in cfg.ENCIA_OPCIONES %}<label><input type="checkbox" name="encia" value="{{ o }}" {{ 'checked' if o in h.encia_list }}><span>{{ o }}</span></label>{% endfor %}</div>
+          <textarea name="encia_notas" placeholder="Zonas afectadas, profundidad de bolsas, índice de placa…">{{ h.encia_notas }}</textarea>
+        </div>
+      </div>
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
       <legend>Odontograma</legend>
-      <p class="muted">Elige un estado en la paleta y haz clic en cada diente (numeración FDI). Clic de nuevo para quitarlo.</p>
+      
       <input type="hidden" name="odontograma_json" id="odontograma_json" value="{{ h.odontograma_json }}">
       {% with readonly=False %}{% include "patients/_odontogram.html" %}{% endwith %}
     </fieldset>
@@ -181,13 +225,44 @@
         <div class="field"><label>Pronóstico</label><select name="pronostico">{% for o in ['', 'Favorable', 'Reservado', 'Desfavorable'] %}<option {{ 'selected' if h.pronostico == o }}>{{ o }}</option>{% endfor %}</select></div>
       </div>
       <div class="checks">
-        <label class="check"><input type="checkbox" name="consentimiento_firmado" {{ 'checked' if h.consentimiento_firmado }}> Consentimiento informado firmado</label>
+        <span class="check" style="cursor:default">{{ icon('check' if h.consentimiento_firmado else 'alert') }} Consentimiento informado: {{ 'firmado' if h.consentimiento_firmado else 'pendiente (fírmalo abajo)' }}</span>
         <label class="check"><input type="checkbox" name="aviso_privacidad" {{ 'checked' if h.aviso_privacidad }}> Aviso de privacidad aceptado</label>
       </div>
     </fieldset>
     <div class="actions"><button class="btn btn-primary">Guardar historia clínica</button>
       <a class="btn" href="/pacientes/{{ p.id }}/historia/imprimir" target="_blank">{{ icon('printer') }} Vista de impresión</a></div>
   </form>
+
+  <div class="card card-pad mt" id="consentimiento">
+    <div class="card-head" style="padding:0 0 12px"><h2>{{ icon('edit') }} Consentimiento informado</h2>
+      {% if h.consentimiento_firma %}<span class="pill pill-ok">Firmado</span>{% elif h.consentimiento_firmado %}<span class="pill pill-ok">Firmado en papel</span>{% else %}<span class="pill pill-warn">Pendiente</span>{% endif %}</div>
+    <p class="consent-text">Declaro que el/la Dr(a). {{ p.primary_doctor.full_name if p.primary_doctor else 'tratante' }} me explicó en términos claros
+      el diagnóstico, el plan de tratamiento, sus alternativas, riesgos y costos; que pude hacer preguntas y que autorizo
+      la atención odontológica descrita en este expediente (NOM-004-SSA3-2012).</p>
+    {% if h.consentimiento_firma %}
+      <figure class="sig-done">
+        <img src="{{ h.consentimiento_firma }}" alt="Firma de {{ h.consentimiento_nombre }}">
+        <figcaption><b>{{ h.consentimiento_nombre }}</b>{% if h.consentimiento_fecha %} · {{ h.consentimiento_fecha|fecha('fechahora') }}{% endif %}</figcaption>
+      </figure>
+      <form method="post" action="/pacientes/{{ p.id }}/consentimiento/eliminar" class="inline-form" data-confirm="¿Eliminar la firma para que el paciente firme de nuevo?">
+        <button class="btn btn-sm btn-ghost btn-danger">{{ icon('x') }} Borrar firma y volver a firmar</button></form>
+    {% else %}
+      {% if h.consentimiento_firmado %}<p class="muted" style="margin:-4px 0 12px">Firmado en papel.</p>{% endif %}
+      <form method="post" action="/pacientes/{{ p.id }}/consentimiento" data-signature>
+        <div class="field"><label>Nombre de quien firma (paciente o tutor)</label>
+          <input type="text" name="nombre" value="{{ p.full_name }}" required maxlength="160"></div>
+        <div class="sig-pad">
+          <canvas aria-label="Recuadro para firmar con el dedo o el mouse"></canvas>
+          <span class="sig-line">Firme aquí</span>
+        </div>
+        <input type="hidden" name="firma">
+        <div class="actions mt">
+          <button type="button" class="btn btn-sm" data-sig-clear>{{ icon('rotate') }} Limpiar</button>
+          <button class="btn btn-primary" data-sig-save disabled>Guardar firma</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
 </section>
 
 {# ---------------- EVOLUCIÓN ---------------- #}
@@ -225,28 +300,32 @@
       {% for t in p.treatments %}
       <div class="card">
         <div class="card-head">
-          <div><h2>{{ t.name }}</h2><small class="muted">{{ t.doctor.short_name }} · creado {{ t.created_at|fecha }}{% if t.external %} · con {{ t.external.full_name }}{% endif %}</small></div>
+          <div><h2>{{ t.name }}</h2><small class="muted">Cobra <b>{{ t.doctor.short_name }}</b> · creado {{ t.created_at|fecha }}</small></div>
           {{ status_pill(t.status) }}
         </div>
         <div class="card-body">
+          {% if t.doctor_id == user.id %}
           <div class="grid g-4" style="gap:10px">
             <div><small class="muted">Total</small><div class="tnum"><b>{{ t.net_total|money }}</b>{% if t.discount %} <small class="muted">(desc. {{ t.discount|money0 }})</small>{% endif %}</div></div>
             <div><small class="muted">Pagado</small><div class="tnum" style="color:var(--ok)"><b>{{ t.paid|money }}</b></div></div>
-            <div><small class="muted">Saldo</small><div class="tnum" style="color:{{ 'var(--bad)' if t.balance else 'inherit' }}"><b>{{ t.balance|money }}</b></div></div>
+            <div><small class="muted">{{ 'Queda a deber' if t.balance else 'Pago' }}</small><div class="tnum">{% if t.balance %}<b style="color:var(--bad)">{{ t.balance|money }}</b>{% else %}<span class="pill pill-ok">{{ icon('check') }} Liquidado</span>{% endif %}</div></div>
             <div><small class="muted">Sesiones</small><div class="tnum"><b>{{ t.sessions_done }}/{{ t.sessions_planned }}</b></div></div>
           </div>
           <div class="row mt" style="gap:14px">
             <div style="flex:1"><small class="muted">Avance clínico</small><div class="progress"><span style="width:{{ t.progress_pct }}%"></span></div></div>
             <div style="flex:1"><small class="muted">Pagado {{ t.paid_pct }}%</small><div class="progress blue"><span style="width:{{ t.paid_pct }}%"></span></div></div>
           </div>
+          {% else %}
+          <div class="pay-note">{{ icon('lock') }}<span>Tratamiento de <b>{{ t.doctor.full_name }}</b>. Sus montos y abonos solo los ve su doctor.</span></div>
+          {% endif %}
           {% if t.description %}<p class="muted mt" style="margin-bottom:0">{{ t.description }}</p>{% endif %}
-          {% if t.external_fee %}<p class="muted" style="margin:4px 0 0">Honorarios especialista: {{ t.external_fee|money }} (registrado como gasto)</p>{% endif %}
 
-          {% if t.payments %}
+          {% if t.payments and t.doctor_id == user.id %}
           <div class="table-wrap mt"><table class="table">
-            <thead><tr><th>Fecha</th><th>Método</th><th>Referencia</th><th class="num">Monto</th><th></th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Cobró</th><th>Método</th><th>Referencia</th><th class="num">Abono</th><th class="num">Quedó a deber</th><th></th></tr></thead>
             <tbody>{% for pay in t.payments %}
-              <tr><td>{{ pay.date|fecha }}</td><td>{{ pay.method }}</td><td class="muted">{{ pay.reference or '—' }}</td><td class="num">{{ pay.amount|money }}</td>
+              <tr><td>{{ pay.date|fecha }}</td><td>{{ pay.doctor.short_name }}</td><td>{{ pay.method }}</td><td class="muted">{{ pay.reference or '—' }}</td><td class="num">{{ pay.amount|money }}</td>
+                <td class="num">{% set ba = t.balance_after(pay) %}{% if ba > 0 %}<span style="color:var(--bad)">{{ ba|money }}</span>{% else %}<span class="pill pill-ok">Liquidado</span>{% endif %}</td>
                 <td class="num"><a class="btn btn-xs" href="/pagos/{{ pay.id }}/recibo" target="_blank" title="Recibo">{{ icon('receipt') }}</a>
                 {% if pay.doctor_id == user.id %}<form method="post" action="/pagos/{{ pay.id }}/eliminar" class="inline-form" data-confirm="¿Eliminar este abono?"><button class="btn btn-xs btn-ghost btn-danger" title="Eliminar">{{ icon('x') }}</button></form>{% endif %}</td></tr>
             {% endfor %}</tbody>
@@ -254,21 +333,18 @@
           {% endif %}
 
           <div class="row wrap mt" style="gap:8px;align-items:flex-end">
-            {% if t.balance > 0 and t.status != 'cancelado' %}
-            <form method="post" action="/pagos/nuevo" class="row wrap" style="gap:8px;align-items:flex-end;flex:1">
-              <input type="hidden" name="treatment_id" value="{{ t.id }}">
-              <div style="width:130px"><label>Abono</label><input type="number" step="0.01" min="1" max="{{ t.balance }}" name="amount" placeholder="{{ t.balance|round(0)|int }}" required></div>
-              <div style="width:150px"><label>Método</label><select name="method">{% for m in cfg.PAYMENT_METHODS %}<option>{{ m }}</option>{% endfor %}</select></div>
-              <div style="width:140px"><label>Fecha</label><input type="date" name="date" value="{{ today() }}"></div>
-              <div style="width:120px"><label>Referencia</label><input type="text" name="reference" placeholder="Opcional"></div>
-              <button class="btn btn-primary">{{ icon('plus') }} Registrar abono</button>
-            </form>
+            {% if t.doctor_id != user.id %}
+            {% elif t.balance > 0 and t.status != 'cancelado' %}
+            <div class="pay-actions">
+              <button type="button" class="btn btn-primary" data-charge-open data-tid="{{ t.id }}" data-fill="all">{{ icon('check') }} Liquidar {{ t.balance|money }}</button>
+              <button type="button" class="btn" data-charge-open data-tid="{{ t.id }}">{{ icon('wallet') }} Abonar</button>
+            </div>
             {% endif %}
             <form method="post" action="/tratamientos/{{ t.id }}" class="row" style="gap:6px;align-items:flex-end">
               <div><label>Estado</label><select name="status" onchange="this.form.submit()">{% for s in ['presupuesto','en proceso','terminado','cancelado'] %}<option {{ 'selected' if t.status == s }}>{{ s }}</option>{% endfor %}</select></div>
               <div style="width:90px"><label>Sesiones</label><input type="number" name="sessions_done" min="0" value="{{ t.sessions_done }}" onchange="this.form.submit()"></div>
             </form>
-            <a class="btn btn-sm" href="/tratamientos/{{ t.id }}/presupuesto" target="_blank">{{ icon('file') }} Presupuesto</a>
+            {% if t.doctor_id == user.id %}<a class="btn btn-sm" href="/tratamientos/{{ t.id }}/presupuesto" target="_blank">{{ icon('file') }} Presupuesto</a>{% endif %}
           </div>
         </div>
       </div>
@@ -291,10 +367,6 @@
         <div class="field"><label>Estado inicial</label><select name="status"><option value="presupuesto">Presupuesto</option><option value="en proceso">Aceptado / en proceso</option></select></div>
       </div>
       <div class="field"><label>Doctor responsable</label><select name="doctor_id">{% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if d.id == user.id }}>{{ d.full_name }}</option>{% endfor %}</select></div>
-      <div class="form-grid">
-        <div class="field"><label>Especialista externo</label><select name="external_id"><option value="">Ninguno</option>{% for e in externals %}<option value="{{ e.id }}">{{ e.full_name }}</option>{% endfor %}</select></div>
-        <div class="field"><label>Honorarios externo</label><input type="number" step="0.01" name="external_fee" value="0"><div class="hint">Se registra como gasto del doctor.</div></div>
-      </div>
       <div class="field"><label>Descripción / qué incluye</label><textarea name="description"></textarea></div>
       <button class="btn btn-primary">Crear tratamiento</button>
     </form>
@@ -310,7 +382,7 @@
       <thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Doctor</th><th>Estado</th><th></th></tr></thead>
       <tbody>{% for a in p.appointments %}
         <tr><td>{{ a.start|fecha('diames') }} {{ a.start.year }}</td><td class="tnum">{{ a.start|fecha('hora') }}–{{ a.end|fecha('hora') }}</td>
-          <td>{{ a.type }}{% if a.external %} <span class="pill pill-violet">{{ a.external.full_name }}</span>{% endif %}</td>
+          <td>{{ a.type }}</td>
           <td>{{ a.doctor.short_name }}</td><td>{{ status_pill(a.status) }}</td>
           <td class="num"><a class="btn btn-xs" href="/citas/{{ a.id }}">Abrir</a></td></tr>
       {% endfor %}</tbody>
@@ -343,4 +415,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script type="module" src="/static/js/typodont3d.js?v=3"></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/typodont3d.js?v=5"></script>{% endblock %}

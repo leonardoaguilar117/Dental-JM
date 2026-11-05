@@ -2,16 +2,12 @@
 {% block title %}Agenda{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Agenda del consultorio</h1><p>Haz clic en un horario libre para agendar. Cada doctor tiene su color; las citas con el cirujano maxilofacial van en gris pizarra.</p></div>
-  <div class="actions"><a class="btn" href="/configuracion#google">{{ icon('google') }} Conectar Google Calendar</a></div>
+  <div><h1>Agenda del consultorio</h1></div>
 </div>
 <div class="card card-pad mb row wrap between">
   <div class="legend">
     {% for d in doctors %}
     <label class="check"><input type="checkbox" class="doc-filter" value="{{ d.id }}" checked> <span class="swatch" style="background:{{ d.color }}"></span> {{ d.full_name }}</label>
-    {% endfor %}
-    {% for e in externals %}
-    <label class="check"><input type="checkbox" id="ext-filter" checked> <span class="swatch" style="background:{{ e.color }}"></span> {{ e.full_name }} ({{ e.specialty }})</label>
     {% endfor %}
   </div>
   <div class="legend"><span><span class="pill pill-info">Programada</span></span><span><span class="pill pill-brand">Confirmada</span></span><span class="muted">Tachada = cancelada</span></div>
@@ -24,7 +20,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const el = document.getElementById("calendar");
   const docs = () => [...document.querySelectorAll(".doc-filter:checked")].map(x => x.value).join(",") || "0";
-  const ext = () => { const e = document.getElementById("ext-filter"); return !e || e.checked ? "1" : "0"; };
   const narrow = window.innerWidth < 760;
   const cal = new FullCalendar.Calendar(el, {
     initialView: narrow ? "timeGridDay" : "timeGridWeek",
@@ -35,14 +30,14 @@ document.addEventListener("DOMContentLoaded", () => {
     buttonText: { today: "Hoy", month: "Mes", week: "Semana", day: "Día", list: "Lista" },
     businessHours: [{ daysOfWeek: [1,2,3,4,5], startTime: "09:00", endTime: "20:00" }, { daysOfWeek: [6], startTime: "09:00", endTime: "14:00" }],
     events: (info, ok, fail) => {
-      const q = new URLSearchParams({ start: info.startStr.slice(0,16), end: info.endStr.slice(0,16), doctores: docs(), externo: ext() });
+      const q = new URLSearchParams({ start: info.startStr.slice(0,16), end: info.endStr.slice(0,16), doctores: docs() });
       fetch("/api/citas?" + q).then(r => r.json()).then(ok).catch(fail);
     },
     dateClick: (info) => { location.href = "/citas/nueva?start=" + encodeURIComponent(info.dateStr.slice(0,16)); },
     eventDidMount: (info) => { info.el.title = info.event.title + " · " + info.event.extendedProps.doctor + " · " + info.event.extendedProps.status; },
   });
   cal.render();
-  document.querySelectorAll(".doc-filter, #ext-filter").forEach(c => c.addEventListener("change", () => cal.refetchEvents()));
+  document.querySelectorAll(".doc-filter").forEach(c => c.addEventListener("change", () => cal.refetchEvents()));
 });
 </script>
 {% endblock %}

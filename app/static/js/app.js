@@ -49,13 +49,14 @@ function initTabs() {
   }));
   ink.style.transition = "none";
   const initial = location.hash.slice(1);
-  if (!initial || !show(initial)) show(tabs[0].dataset.tab);
+  // por defecto, la primera pestaña de la barra (no un enlace a pestaña que esté antes en la página)
+  if (!initial || !show(initial)) show((bar.querySelector("[data-tab]") || tabs[0]).dataset.tab);
   requestAnimationFrame(() => (ink.style.transition = ""));
   window.addEventListener("resize", () => moveInk(bar.querySelector("[data-tab].active")));
 }
 
 // ---- Odontograma interactivo ----
-const DARK_STATES = ["caries", "endodoncia", "extraer", "bracket", "obturado"];
+const DARK_STATES = ["caries", "endodoncia", "extraer", "extraido", "bracket", "obturado"];
 function initOdontogram() { document.querySelectorAll("[data-odonto]").forEach(setupOdontogram); }
 function setupOdontogram(root) {
   const readonly = root.classList.contains("readonly");
@@ -202,4 +203,185 @@ function initDock() {
   dock.addEventListener("mouseleave", () => { y = null; if (!raf) raf = requestAnimationFrame(update); });
 }
 
-document.addEventListener("DOMContentLoaded", () => { initToasts(); initTabs(); initOdontogram(); initCounters(); initThemePicker(); initDock(); });
+// ---- Móvil: hoja "Más" con las secciones que no caben en la barra ----
+function setMore(open) {
+  document.body.classList.toggle("more-open", open);
+  document.querySelectorAll("[data-more]").forEach((b) => b.setAttribute("aria-expanded", open));
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-more]")) { setMore(!document.body.classList.contains("more-open")); return; }
+  if (document.body.classList.contains("more-open") && (e.target.matches("[data-more-sheet]") || e.target.closest(".more-item, .more-user"))) setMore(false);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") setMore(false); });
+
+// ---- Hoja de cobro: elegir qué paga, cuánto y cómo; muestra lo que quedará a deber ----
+function initCharge() {
+  const dlg = document.querySelector("[data-charge]");
+  if (!dlg) return;
+  const fmt = (n) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+  const form = dlg.querySelector("[data-charge-form]");
+  const amount = form.querySelector("[data-amount]");
+  const after = form.querySelector("[data-after]");
+  const submit = form.querySelector("[data-charge-submit] span");
+  const concept = form.querySelector("[data-concept]");
+  const quick = form.querySelector("[data-quick]");
+  const picked = () => form.querySelector('input[name="treatment_id"]:checked');
+  const balance = () => { const r = picked(); return r && r.dataset.balance ? Number(r.dataset.balance) : null; };
+
+  const update = () => {
+    const b = balance(), a = Number(amount.value) || 0;
+    concept.hidden = b !== null;
+    concept.querySelector("input").required = b === null;
+    if (b !== null) amount.max = b; else amount.removeAttribute("max");
+    quick.querySelectorAll("button").forEach((q) => {
+      const v = q.dataset.q;
+      q.hidden = b === null ? (v === "all" || v === "half") : (Number(v) >= b);
+      const val = v === "all" ? b : v === "half" ? (b === null ? null : Math.round(b / 2 * 100) / 100) : Number(v);
+      q.classList.toggle("active", a > 0 && val === a);
+    });
+    submit.textContent = a ? `Cobrar ${fmt(a)}` : "Cobrar";
+    after.className = "charge-after";
+    if (b === null) { after.textContent = a ? "Se registra como pagado en el expediente." : ""; return; }
+    const rest = Math.round((b - a) * 100) / 100;
+    if (!a) { after.textContent = `Debe ${fmt(b)}`; }
+    else if (rest < 0) { after.textContent = `Excede lo que debe por ${fmt(-rest)}`; after.classList.add("over"); }
+    else if (rest === 0) { after.textContent = "Queda liquidado"; after.classList.add("ok"); }
+    else { after.textContent = `Después de este pago quedará a deber ${fmt(rest)}`; after.classList.add("owe"); }
+  };
+
+  const open = (tid, fill) => {
+    if (tid) { const r = form.querySelector(`input[name="treatment_id"][value="${tid}"]`); if (r) r.checked = true; }
+    amount.value = fill === "all" && balance() !== null ? balance() : "";
+    update();
+    dlg.showModal();
+    if (!amount.value) amount.focus();
+  };
+
+  form.addEventListener("change", (e) => { if (e.target.name === "treatment_id") amount.value = ""; update(); });
+  amount.addEventListener("input", update);
+  quick.addEventListener("click", (e) => {
+    const q = e.target.closest("button"); if (!q) return;
+    const b = balance();
+    amount.value = q.dataset.q === "all" ? b : q.dataset.q === "half" ? Math.round(b / 2 * 100) / 100 : q.dataset.q;
+    update();
+  });
+  form.addEventListener("submit", (e) => {
+    const b = balance(), a = Number(amount.value) || 0;
+    if (b !== null && a > b + 0.01) { e.preventDefault(); amount.focus(); return; }
+    form.querySelector("[data-charge-submit]").disabled = true;
+  });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-charge-open]");
+    if (b) { e.preventDefault(); open(b.dataset.tid, b.dataset.fill); }
+    if (e.target.closest("[data-charge-close]") || e.target === dlg) dlg.close();
+  });
+
+  // ?cobrar=1 abre la hoja; ?cobrar=<id> la abre con ese tratamiento y su saldo
+  const url = new URL(location.href), c = url.searchParams.get("cobrar");
+  const clean = (k) => { url.searchParams.delete(k); history.replaceState(null, "", url.pathname + url.search + url.hash); };
+  if (c) { clean("cobrar"); open(c !== "1" ? c : null, c !== "1" ? "all" : null); }
+  else if (url.searchParams.has("recibo")) clean("recibo");
+}
+
+// ---- Entrada al depósito: muestra el egreso que se registrará ----
+function initBuy() {
+  const fmt = (n) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+  document.querySelectorAll("[data-buy-form]").forEach((form) => {
+    const chk = form.querySelector("[data-buy]"), out = form.querySelector("[data-buy-total]"), meth = form.querySelector("[data-buy-method]");
+    const qty = form.querySelector('[name="quantity"], [name="initial_qty"]'), cost = form.querySelector('[name="unit_cost"], [name="cost_price"]');
+    const upd = () => {
+      const v = (Number(qty.value) || 0) * (Number(cost.value) || 0);
+      out.textContent = chk.checked && v ? `(${fmt(v)})` : "";
+      meth.hidden = !chk.checked;
+    };
+    form.addEventListener("input", upd); upd();
+  });
+}
+
+// ---- Foto del doctor: se recorta en cuadro y se reduce antes de subirla ----
+function initPhoto() {
+  document.querySelectorAll("[data-photo]").forEach((form) => {
+    const input = form.querySelector("[data-photo-input]");
+    input?.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        const S = 320, side = Math.min(img.naturalWidth, img.naturalHeight);
+        const c = document.createElement("canvas");
+        c.width = c.height = S;
+        const ctx = c.getContext("2d");
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, S, S);
+        form.querySelector('input[name="foto"]').value = c.toDataURL("image/jpeg", 0.86);
+        URL.revokeObjectURL(img.src);
+        form.classList.add("busy");
+        form.submit();
+      };
+      img.onerror = () => alert("No se pudo leer la imagen. Prueba con una foto JPG o PNG.");
+      img.src = URL.createObjectURL(file);
+    });
+  });
+  document.querySelectorAll("[data-show-pass]").forEach((cb) => cb.addEventListener("change", () => {
+    cb.closest("form").querySelectorAll('input[type="password"], input[data-was-pass]').forEach((i) => {
+      i.dataset.wasPass = "1";
+      i.type = cb.checked ? "text" : "password";
+    });
+  }));
+}
+
+// ---- Firma en pantalla (consentimiento informado) ----
+function initSignature() {
+  document.querySelectorAll("[data-signature]").forEach((form) => {
+    const canvas = form.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    const save = form.querySelector("[data-sig-save]");
+    let drawing = false, dirty = false, last = null;
+    const ink = () => getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#1c2030";
+    function size() {
+      // el lienzo se dimensiona a su caja real × densidad de pantalla (trazo nítido en móvil)
+      const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      if (!r.width) return;
+      canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineCap = ctx.lineJoin = "round"; ctx.lineWidth = 2.4; ctx.strokeStyle = ink();
+      dirty = false; save.disabled = true;
+    }
+    const pos = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    canvas.addEventListener("pointerdown", (e) => {
+      drawing = true; last = pos(e); canvas.setPointerCapture(e.pointerId);
+      ctx.beginPath(); ctx.arc(last.x, last.y, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drawing) return;
+      const p = pos(e);
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      last = p;
+      if (!dirty) { dirty = true; save.disabled = false; form.classList.add("signed"); }
+    });
+    const stop = () => { drawing = false; };
+    canvas.addEventListener("pointerup", stop);
+    canvas.addEventListener("pointercancel", stop);
+    form.querySelector("[data-sig-clear]").addEventListener("click", () => { size(); form.classList.remove("signed"); });
+    form.addEventListener("submit", (e) => {
+      if (!dirty) { e.preventDefault(); return; }
+      // se guarda con trazo oscuro sobre fondo transparente: legible al imprimir con cualquier tema
+      const out = document.createElement("canvas");
+      out.width = canvas.width; out.height = canvas.height;
+      const o = out.getContext("2d");
+      o.drawImage(canvas, 0, 0);
+      o.globalCompositeOperation = "source-in"; o.fillStyle = "#1c2030"; o.fillRect(0, 0, out.width, out.height);
+      form.querySelector('input[name="firma"]').value = out.toDataURL("image/png");
+    });
+    // la pestaña puede estar oculta al cargar: se dimensiona cuando el recuadro se vuelve visible
+    new ResizeObserver(() => { if (!dirty) size(); }).observe(canvas);
+  });
+}
+
+// enlaces que abren una pestaña y bajan a una sección (p.ej. "Falta consentimiento")
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("[data-scroll]");
+  if (a) setTimeout(() => document.querySelector(a.dataset.scroll)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+});
+
+document.addEventListener("DOMContentLoaded", () => { initToasts(); initTabs(); initOdontogram(); initCounters(); initThemePicker(); initDock(); initSignature(); initCharge(); initBuy(); initPhoto(); });

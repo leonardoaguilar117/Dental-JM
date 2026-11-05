@@ -15,25 +15,26 @@
     <option value="">Todos los doctores</option>
     {% for d in doctors %}<option value="{{ d.id }}" {{ 'selected' if doctor == d.id|string }}>{{ d.full_name }}</option>{% endfor %}
   </select>
-  <label class="check"><input type="checkbox" name="saldo" value="1" {{ 'checked' if saldo }} onchange="this.form.submit()"> Solo con saldo pendiente</label>
+  <label class="check"><input type="checkbox" name="saldo" value="1" {{ 'checked' if saldo }} onchange="this.form.submit()"> Solo los que me deben</label>
   <button class="btn">Buscar</button>
 </form>
 
 <div class="card">
   {% if patients %}
-  <div class="table-wrap"><table class="table">
-    <thead><tr><th>Paciente</th><th class="num">Edad</th><th>Teléfono</th><th>Doctor tratante</th><th>Alertas médicas</th><th class="num">Saldo</th><th></th></tr></thead>
+  <div class="table-wrap"><table class="table pt-table">
+    <thead><tr><th>Paciente</th><th class="num m-hide">Edad</th><th class="m-hide">Teléfono</th><th class="m-hide">Doctor tratante</th><th class="m-hide">Alertas médicas</th><th class="num">Te debe</th><th></th></tr></thead>
     <tbody>
     {% for p in patients %}
       <tr>
         <td><div class="row"><span style="display:inline-block;view-transition-name: pav-{{ p.id }}">{{ avatar(p.initials, p.primary_doctor.color if p.primary_doctor else '#64748b') }}</span>
           <div><a class="rowlink" href="/pacientes/{{ p.id }}" style="view-transition-name: pname-{{ p.id }}">{{ p.full_name }}</a><div class="muted" style="font-size:12px">{{ p.email or '—' }}</div></div></div></td>
-        <td class="num">{{ p.age if p.age is not none else '—' }}</td>
-        <td class="tnum">{{ p.phone or '—' }}</td>
-        <td>{% if p.primary_doctor %}<span class="row" style="gap:6px"><span class="swatch" style="background:{{ p.primary_doctor.color }}"></span>{{ p.primary_doctor.short_name }}</span>{% endif %}</td>
-        <td>{% if p.history and p.history.alert_flags %}{% for f in p.history.alert_flags[:2] %}<span class="pill pill-bad" style="margin:1px">{{ f }}</span>{% endfor %}{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td class="num">{% if p.balance > 0 %}<b>{{ p.balance|money0 }}</b>{% else %}<span class="muted">$0</span>{% endif %}</td>
-        <td class="num">
+        <td class="num m-hide">{{ p.age if p.age is not none else '—' }}</td>
+        <td class="tnum m-hide">{{ p.phone or '—' }}</td>
+        <td class="m-hide">{% if p.primary_doctor %}<span class="row" style="gap:6px"><span class="swatch" style="background:{{ p.primary_doctor.color }}"></span>{{ p.primary_doctor.short_name }}</span>{% endif %}</td>
+        <td class="m-hide">{% if p.history and p.history.alert_flags %}{% for f in p.history.alert_flags[:2] %}<span class="pill pill-bad" style="margin:1px">{{ f }}</span>{% endfor %}{% else %}<span class="muted">—</span>{% endif %}</td>
+        {% set mybal = p.balance_for(user.id) %}<td class="num pt-debt">{% if mybal > 0 %}<b class="owe-amt">{{ mybal|money0 }}</b>{% else %}<span class="pill pill-ok">Al corriente</span>{% endif %}</td>
+        <td class="num row-actions pt-actions">
+          {% if mybal > 0 %}<a class="btn btn-xs btn-primary" href="/pacientes/{{ p.id }}?cobrar=1">{{ icon('wallet') }} Cobrar</a>{% endif %}
           {% if p.phone %}<a class="btn btn-xs" href="{{ wa(p.phone, 'Hola ' ~ p.first_name ~ ', te saludamos del Consultorio Dental JM.') }}" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp a {{ p.full_name }}">{{ icon('message') }}</a>{% endif %}
           <a class="btn btn-xs" href="/citas/nueva?paciente={{ p.id }}" title="Agendar">{{ icon('calendar') }}</a>
         </td>

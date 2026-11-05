@@ -9,14 +9,25 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import get_db
-from ..models import Lot, Movement, Patient, Product, User
+from ..models import Expense, Lot, Movement, Patient, Product, User
 from ..services import inventory as inv
-from ..utils import parse_date, to_float, today_local
+from ..utils import MESES, month_bounds, now_local, parse_date, to_float, today_local
+from ..services import finance
 from ..web import flash, inventory_user, redirect, render
 
 router = APIRouter(prefix="/inventario")
 
-FIELDS = ["sku", "name", "category", "brand", "unit", "supplier", "location", "notes"]
+FIELDS = ["sku", "name", "category", "brand", "unit", "supplier", "notes"]
+
+
+def _purchase_expense(db: Session, user: User, p: Product, qty: float, unit_cost: float, method: str) -> float:
+    """Una compra que entra al depósito se registra también como egreso de quien administra el depósito."""
+    amount = round(qty * (unit_cost or p.cost_price), 2)
+    if amount > 0:
+        db.add(Expense(date=today_local(), concept=f"Compra depósito: {qty:g} {p.unit} · {p.name}"[:200],
+                       category="Compra de inventario", amount=amount, is_shared=False, owner_id=user.id,
+                       method=method or "Efectivo", notes="Entrada al depósito", created_by_id=user.id))
+    return amount
 
 
 def _product(db: Session, pid: int, user: User) -> Product:
@@ -78,7 +89,9 @@ async def create_product(request: Request, db: Session = Depends(get_db), user: 
     if qty > 0:
         try:
             inv.register_entry(db, p, qty, str(f.get("lot_code", "")), parse_date(f.get("expiry_date")),
-                               p.cost_price, user.id, "Inventario inicial")
+                               p.cost_price, user.id, "Compra a proveedor" if f.get("as_expense") == "on" else "Inventario inicial")
+            if f.get("as_expense") == "on":
+                _purchase_expense(db, user, p, qty, p.cost_price, str(f.get("method") or ""))
         except inv.StockError as e:
             db.rollback()
             flash(request, str(e), "error")
@@ -118,11 +131,13 @@ async def entry(pid: int, request: Request, db: Session = Depends(get_db), user:
     p = _product(db, pid, user)
     f = await request.form()
     try:
-        inv.register_entry(db, p, to_float(f.get("quantity")), str(f.get("lot_code", "")).strip(),
-                           parse_date(f.get("expiry_date")), to_float(f.get("unit_cost")), user.id,
+        qty, cost = to_float(f.get("quantity")), to_float(f.get("unit_cost"))
+        inv.register_entry(db, p, qty, str(f.get("lot_code", "")).strip(),
+                           parse_date(f.get("expiry_date")), cost, user.id,
                            str(f.get("reason") or "Compra a proveedor"))
+        spent = _purchase_expense(db, user, p, qty, cost, str(f.get("method") or "")) if f.get("as_expense") == "on" else 0
         db.commit()
-        flash(request, "Entrada registrada.")
+        flash(request, f"Entrada registrada. Egreso de ${spent:,.2f} agregado a tus finanzas." if spent else "Entrada registrada.")
     except inv.StockError as e:
         db.rollback()
         flash(request, str(e), "error")
@@ -157,7 +172,7 @@ def discard_lot(lid: int, request: Request, db: Session = Depends(get_db), user:
         raise HTTPException(404)
     inv.discard_expired(db, lot, user.id)
     db.commit()
-    flash(request, f"Lote {lot.lot_code} dado de baja.")
+    flash(request, "Existencia caducada dada de baja.")
     return redirect(f"/inventario/producto/{lot.product_id}")
 
 
@@ -188,10 +203,82 @@ def export(db: Session = Depends(get_db), user: User = Depends(inventory_user)):
     buf.write("﻿")
     w = csv.writer(buf)
     w.writerow(["SKU", "Producto", "Categoría", "Marca", "Unidad", "Stock", "Mínimo", "Costo", "Precio venta",
-                "Valor", "Próxima caducidad", "Proveedor", "Ubicación"])
+                "Valor", "Próxima caducidad", "Proveedor"])
     for p in db.scalars(select(Product).where(Product.owner_id == user.id).order_by(Product.name)):
         w.writerow([p.sku, p.name, p.category, p.brand, p.unit, p.stock, p.min_stock, p.cost_price, p.sale_price,
-                    p.stock_value, p.next_expiry.isoformat() if p.next_expiry else "", p.supplier, p.location])
+                    p.stock_value, p.next_expiry.isoformat() if p.next_expiry else "", p.supplier])
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": f'attachment; filename="inventario_{today_local()}.csv"'})
+
+
+# ---------- Ventas del depósito ----------
+@router.get("/venta")
+def sale_form(request: Request, db: Session = Depends(get_db), user: User = Depends(inventory_user)):
+    products = sorted(db.scalars(select(Product).where(Product.owner_id == user.id, Product.active)).all(),
+                      key=lambda p: p.name)
+    patients = db.scalars(select(Patient).where(Patient.active).order_by(Patient.first_name)).all()
+    return render(request, "inventory/sale.html", db, user, products=products, patients=patients,
+                  month_name=MESES[today_local().month - 1])
+
+
+@router.post("/venta")
+async def create_sale(request: Request, db: Session = Depends(get_db), user: User = Depends(inventory_user)):
+    f = await request.form()
+    pids, qtys, prices = f.getlist("product_id"), f.getlist("qty"), f.getlist("price")
+    lines = [(int(a), to_float(b), to_float(c)) for a, b, c in zip(pids, qtys, prices) if str(a).isdigit() and to_float(b) > 0]
+    if not lines:
+        flash(request, "Agrega al menos un producto con cantidad.", "error")
+        return redirect("/inventario/venta")
+    now = now_local()
+    prefix = f"V{now:%y%m%d}-"
+    n = len(set(db.scalars(select(Movement.ticket).where(Movement.ticket.like(prefix + "%"))).all()))
+    ticket = f"{prefix}{n + 1:03d}"
+    pid_patient = int(f["patient_id"]) if str(f.get("patient_id") or "").isdigit() else None
+    customer = str(f.get("customer", "")).strip()[:120]
+    method = str(f.get("method") or "Efectivo")
+    total = 0.0
+    try:
+        for prod_id, qty, price in lines:
+            p = _product(db, prod_id, user)
+            for m in inv.register_exit(db, p, qty, "venta", user.id, unit_price=price,
+                                       reason="Venta" + (f" · {customer}" if customer else ""), patient_id=pid_patient):
+                m.ticket, m.method, m.customer = ticket, method, customer
+            total += qty * price
+        db.commit()
+    except inv.StockError as e:
+        db.rollback()
+        flash(request, f"{p.name}: {e}", "error")
+        return redirect("/inventario/venta")
+    flash(request, f"Venta {ticket} por ${total:,.2f} registrada y sumada a tus ingresos.")
+    return redirect(f"/inventario/ventas/{ticket}")
+
+
+@router.get("/ventas")
+def sales_list(request: Request, mes: str | None = None, db: Session = Depends(get_db),
+               user: User = Depends(inventory_user)):
+    t = today_local()
+    try:
+        y, m = (int(x) for x in (mes or "").split("-"))
+    except ValueError:
+        y, m = t.year, t.month
+    start, end = month_bounds(y, m)
+    tickets = finance.sales_tickets(db, user, start, end)
+    purchases = sum(e.amount for e in db.scalars(select(Expense).where(
+        Expense.owner_id == user.id, Expense.category == "Compra de inventario",
+        Expense.date >= start, Expense.date < end)).all())
+    return render(request, "inventory/sales.html", db, user, tickets=tickets, year=y, month=m,
+                  month_name=MESES[m - 1], mes=f"{y}-{m:02d}", total=sum(x["total"] for x in tickets),
+                  cost=sum(x["cost"] for x in tickets), purchases=purchases)
+
+
+@router.get("/ventas/{ticket}")
+def sale_ticket(ticket: str, request: Request, db: Session = Depends(get_db), user: User = Depends(inventory_user)):
+    items = db.scalars(select(Movement).join(Product).where(Movement.ticket == ticket, Product.owner_id == user.id)
+                       .order_by(Movement.id)).all()
+    if not items:
+        raise HTTPException(404)
+    m0 = items[0]
+    tk = {"code": ticket, "date": m0.date, "method": m0.method, "customer": m0.customer_label,
+          "lines": items, "total": sum(m.total for m in items)}
+    return render(request, "inventory/ticket.html", db, user, tk=tk)

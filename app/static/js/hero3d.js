@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { createStage, enamelMaterial, detailedMolarGeometry, contactShadow, css, reduceMotion, hasWebGL } from "./dental3d.js";
 
-const isDark = () => ["arrecife", "grafito"].includes(document.documentElement.dataset.theme);
+const isDark = () => document.documentElement.dataset.theme === "arrecife";
 
 function mountHero(el) {
   if (!hasWebGL()) { el.classList.add("ready"); return; }

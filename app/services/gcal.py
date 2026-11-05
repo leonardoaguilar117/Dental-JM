@@ -1,10 +1,7 @@
 """Integración con Google Calendar.
 
-Tres niveles (de menor a mayor configuración):
-1. Enlace "Añadir a Google Calendar" por cita (sin configuración).
-2. Feed iCal privado por doctor (/calendario/<token>.ics) que Google Calendar puede suscribir
-   ("Otros calendarios > Desde URL"). Sincroniza en un solo sentido; Google lo refresca cada varias horas.
-3. Sincronización directa vía Google Calendar API con una cuenta de servicio:
+1. Sin configuración: al agendar, botón "Agregar a Google Calendar" con el evento prellenado.
+2. Sincronización automática vía Google Calendar API con una cuenta de servicio:
    - Definir GOOGLE_SERVICE_ACCOUNT_JSON (contenido JSON de la llave).
    - Cada doctor comparte su calendario con el correo de la cuenta de servicio
      ("Hacer cambios en eventos") y pega el ID del calendario en Configuración.
@@ -14,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
 from urllib.parse import urlencode
 
 from ..config import GOOGLE_SERVICE_ACCOUNT_JSON, TIMEZONE
@@ -52,14 +48,11 @@ def _get_service():
 
 
 def _title(a: Appointment) -> str:
-    extra = f" + {a.external.full_name}" if a.external else ""
-    return f"{a.type} · {a.patient.full_name}{extra}"
+    return f"{a.type} · {a.patient.full_name}"
 
 
 def _description(a: Appointment) -> str:
     lines = [f"Paciente: {a.patient.full_name}", f"Tel: {a.patient.phone}", f"Doctor(a): {a.doctor.full_name}"]
-    if a.external:
-        lines.append(f"Especialista: {a.external.full_name} ({a.external.specialty})")
     if a.notes:
         lines.append(f"Notas: {a.notes}")
     return "\n".join(lines)
@@ -72,7 +65,6 @@ def event_body(a: Appointment) -> dict:
         "description": _description(a),
         "start": {"dateTime": a.start.isoformat(), "timeZone": tz},
         "end": {"dateTime": a.end.isoformat(), "timeZone": tz},
-        "colorId": "3" if a.external else None,
     }
 
 
@@ -109,36 +101,3 @@ def add_link(a: Appointment) -> str:
     }
     return "https://calendar.google.com/calendar/render?" + urlencode(params)
 
-
-def _ics_escape(text: str) -> str:
-    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
-
-
-def ics_feed(user: User, appointments: list[Appointment]) -> str:
-    fmt = "%Y%m%dT%H%M%S"
-    stamp = datetime.utcnow().strftime(fmt) + "Z"
-    tz = str(TIMEZONE)
-    lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Consultorio Dental JM//CRM//ES",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        f"X-WR-CALNAME:Consultorio JM · {user.short_name}",
-        f"X-WR-TIMEZONE:{tz}",
-    ]
-    for a in appointments:
-        status = "CANCELLED" if a.status == "cancelada" else "CONFIRMED"
-        lines += [
-            "BEGIN:VEVENT",
-            f"UID:cita-{a.id}@consultorio-jm",
-            f"DTSTAMP:{stamp}",
-            f"DTSTART;TZID={tz}:{a.start.strftime(fmt)}",
-            f"DTEND;TZID={tz}:{a.end.strftime(fmt)}",
-            f"SUMMARY:{_ics_escape(_title(a))}",
-            f"DESCRIPTION:{_ics_escape(_description(a))}",
-            f"STATUS:{status}",
-            "END:VEVENT",
-        ]
-    lines.append("END:VCALENDAR")
-    return "\r\n".join(lines) + "\r\n"

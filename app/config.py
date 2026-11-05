@@ -79,5 +79,16 @@ TOOTH_STATES = {
     "corona": ("Corona / carilla", "#e2f8af"),
     "ausente": ("Ausente", "#d3d6de"),
     "extraer": ("Por extraer", "#1c2030"),
+    "extraido": ("Extraído", "#8c2f39"),
     "bracket": ("Bracket", "#418d96"),
 }
+
+# Exploración de lengua y encía (historia clínica)
+LENGUA_OPCIONES = [
+    "Lengua geográfica", "Lengua fisurada", "Lengua saburral", "Glositis", "Macroglosia", "Anquiloglosia",
+    "Candidiasis oral", "Úlceras / aftas", "Leucoplasia", "Otro",
+]
+ENCIA_OPCIONES = [
+    "Gingivitis", "Periodontitis", "Recesión gingival", "Hiperplasia gingival", "Sangrado al sondeo",
+    "Bolsas periodontales", "Absceso periodontal", "Pericoronitis", "Movilidad dental", "Otro",
+]

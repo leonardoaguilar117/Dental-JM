@@ -13,7 +13,6 @@
     <dt>Tratamiento</dt><dd>{{ t.name }}</dd>
     {% if t.description %}<dt>Incluye</dt><dd>{{ t.description }}</dd>{% endif %}
     <dt>Sesiones estimadas</dt><dd>{{ t.sessions_planned }}</dd>
-    {% if t.external %}<dt>Especialista</dt><dd>{{ t.external.full_name }} ({{ t.external.specialty }})</dd>{% endif %}
   </dl>
   <table class="table">
     <tbody>

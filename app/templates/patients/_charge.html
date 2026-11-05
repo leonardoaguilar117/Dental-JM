@@ -1,0 +1,60 @@
+{# Hoja de cobro: un solo lugar para cobrar abonos, liquidar saldos o cobrar una consulta suelta. #}
+{% set open_t = p.treatments|rejectattr('status','equalto','cancelado')|selectattr('balance','gt',0)|list %}
+{% set mine = open_t|selectattr('doctor_id','equalto',user.id)|list %}
+<dialog class="charge" id="cobro" data-charge aria-labelledby="charge-title">
+  <form method="post" action="/pagos/nuevo" class="charge-form" data-charge-form>
+    <input type="hidden" name="patient_id" value="{{ p.id }}">
+    <header class="charge-head">
+      <div><small class="muted">Cobrar a</small><h2 id="charge-title">{{ p.full_name }}</h2></div>
+      <button type="button" class="btn btn-sm btn-ghost" data-charge-close aria-label="Cerrar">{{ icon('x') }}</button>
+    </header>
+
+    <div class="charge-body">
+      <div class="charge-label">¿Qué paga?</div>
+      <div class="charge-options">
+        {% for t in mine %}
+        <label class="charge-opt">
+          <input type="radio" name="treatment_id" value="{{ t.id }}" data-balance="{{ '%.2f'|format(t.balance) }}" {{ 'checked' if loop.first }}>
+          <span class="grow"><b>{{ t.name }}</b><small>Pagado {{ t.paid|money0 }} de {{ t.net_total|money0 }}</small></span>
+          <span class="charge-owe"><small>Debe</small>{{ t.balance|money }}</span>
+        </label>
+        {% endfor %}
+        <label class="charge-opt">
+          <input type="radio" name="treatment_id" value="nuevo" data-balance="" {{ 'checked' if not mine }}>
+          <span class="grow"><b>Otro concepto</b><small>Consulta, urgencia u otro cobro sin presupuesto</small></span>
+        </label>
+        <div class="charge-concept" data-concept {{ 'hidden' if mine }}>
+          <input type="text" name="concept" placeholder="Ej. Consulta de valoración" list="charge-concepts" autocomplete="off">
+          <datalist id="charge-concepts">{% for c in ['Consulta de valoración', 'Consulta de urgencia', 'Limpieza dental', 'Radiografía', 'Ajuste de ortodoncia'] %}<option value="{{ c }}">{% endfor %}</datalist>
+        </div>
+      </div>
+
+      <div class="charge-label">Monto</div>
+      <div class="charge-amount"><span>$</span><input type="number" name="amount" step="0.01" min="1" required inputmode="decimal" placeholder="0.00" data-amount aria-label="Monto a cobrar"></div>
+      <div class="charge-quick" data-quick>
+        <button type="button" data-q="all">Liquidar todo</button>
+        <button type="button" data-q="half">La mitad</button>
+        <button type="button" data-q="500">$500</button>
+        <button type="button" data-q="1000">$1,000</button>
+      </div>
+      <p class="charge-after" data-after aria-live="polite"></p>
+
+      <div class="charge-label">Forma de pago</div>
+      <div class="charge-methods">
+        {% for m in cfg.PAYMENT_METHODS %}<label><input type="radio" name="method" value="{{ m }}" {{ 'checked' if loop.first }}><span>{{ m }}</span></label>{% endfor %}
+      </div>
+
+      <details class="charge-more">
+        <summary>Fecha y referencia</summary>
+        <div class="form-grid mt">
+          <div class="field"><label>Fecha</label><input type="date" name="date" value="{{ today() }}"></div>
+          <div class="field"><label>Referencia</label><input type="text" name="reference" placeholder="Folio de tarjeta o transferencia"></div>
+        </div>
+      </details>
+    </div>
+
+    <footer class="charge-foot">
+      <button class="btn btn-primary charge-submit" data-charge-submit>{{ icon('wallet') }} <span>Cobrar</span></button>
+    </footer>
+  </form>
+</dialog>

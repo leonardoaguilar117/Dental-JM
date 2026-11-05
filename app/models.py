@@ -32,6 +32,7 @@ class User(Base):
     shared_expense_pct: Mapped[float] = mapped_column(Float, default=50.0)
     ical_token: Mapped[str] = mapped_column(String(64), default="")
     gcal_calendar_id: Mapped[str] = mapped_column(String(255), default="")
+    photo: Mapped[str] = mapped_column(Text, default="")  # foto del doctor (JPEG en data URL, 320×320)
 
     @property
     def initials(self) -> str:
@@ -110,6 +111,13 @@ class Patient(Base):
     def balance(self) -> float:
         return sum(t.balance for t in self.treatments if t.status != "cancelado")
 
+    def balance_for(self, doctor_id: int) -> float:
+        """Lo que el paciente le debe a un doctor (cada doctor solo ve sus propios montos)."""
+        return sum(t.balance for t in self.treatments if t.status != "cancelado" and t.doctor_id == doctor_id)
+
+    def total_for(self, doctor_id: int) -> float:
+        return sum(t.net_total for t in self.treatments if t.status != "cancelado" and t.doctor_id == doctor_id)
+
 
 class MedicalHistory(Base):
     """Historia clínica odontológica (estructura basada en NOM-004-SSA3 / NOM-013-SSA2)."""
@@ -140,7 +148,16 @@ class MedicalHistory(Base):
     plan_tratamiento: Mapped[str] = mapped_column(Text, default="")
     pronostico: Mapped[str] = mapped_column(String(60), default="")
     odontograma_json: Mapped[str] = mapped_column(Text, default="{}")
+    # lengua y encía: hallazgos (lista JSON de opciones de config) + notas libres
+    lengua_hallazgos: Mapped[str] = mapped_column(Text, default="[]")
+    lengua_notas: Mapped[str] = mapped_column(Text, default="")
+    encia_hallazgos: Mapped[str] = mapped_column(Text, default="[]")
+    encia_notas: Mapped[str] = mapped_column(Text, default="")
     consentimiento_firmado: Mapped[bool] = mapped_column(Boolean, default=False)
+    # firma autógrafa capturada en pantalla (PNG en data URL), quién firmó y cuándo
+    consentimiento_firma: Mapped[str] = mapped_column(Text, default="")
+    consentimiento_nombre: Mapped[str] = mapped_column(String(160), default="")
+    consentimiento_fecha: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     aviso_privacidad: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -154,6 +171,22 @@ class MedicalHistory(Base):
             return json.loads(self.odontograma_json or "{}")
         except ValueError:
             return {}
+
+    @staticmethod
+    def _list(raw: str) -> list[str]:
+        try:
+            v = json.loads(raw or "[]")
+            return [str(x) for x in v] if isinstance(v, list) else []
+        except ValueError:
+            return []
+
+    @property
+    def lengua_list(self) -> list[str]:
+        return self._list(self.lengua_hallazgos)
+
+    @property
+    def encia_list(self) -> list[str]:
+        return self._list(self.encia_hallazgos)
 
     @property
     def alert_flags(self) -> list[str]:
@@ -249,6 +282,12 @@ class Treatment(Base):
     @property
     def balance(self) -> float:
         return round(max(self.net_total - self.paid, 0), 2)
+
+    def balance_after(self, payment: "Payment") -> float:
+        """Lo que quedó a deber justo después de ese abono (no el saldo de hoy)."""
+        key = (payment.date, payment.id)
+        paid = sum(p.amount for p in self.payments if (p.date, p.id) <= key)
+        return round(max(self.net_total - paid, 0), 2)
 
     @property
     def paid_pct(self) -> int:
@@ -349,6 +388,13 @@ class Product(Base):
         return round(sum(l.quantity for l in self.lots), 2)
 
     @property
+    def sellable_stock(self) -> float:
+        """Existencia que se puede vender o usar: excluye lotes caducados."""
+        from .utils import today_local
+        t = today_local()
+        return round(sum(l.quantity for l in self.lots if l.quantity > 0 and (not l.expiry_date or l.expiry_date >= t)), 2)
+
+    @property
     def is_low(self) -> bool:
         return self.stock <= self.min_stock
 
@@ -399,6 +445,9 @@ class Movement(Base):
     reason: Mapped[str] = mapped_column(String(255), default="")
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"), nullable=True)
+    ticket: Mapped[str] = mapped_column(String(24), default="", index=True)  # folio de la nota de venta
+    method: Mapped[str] = mapped_column(String(30), default="")  # forma de pago de la venta
+    customer: Mapped[str] = mapped_column(String(120), default="")
 
     product: Mapped[Product] = relationship(back_populates="movements")
     lot: Mapped[Lot | None] = relationship()
@@ -407,3 +456,7 @@ class Movement(Base):
     @property
     def total(self) -> float:
         return round(abs(self.quantity) * self.unit_price, 2)
+
+    @property
+    def customer_label(self) -> str:
+        return self.patient.full_name if self.patient else (self.customer or "Mostrador")
