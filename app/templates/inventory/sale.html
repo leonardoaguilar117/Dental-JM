@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Registrar venta{% endblock %}
+{% block topactions %}<a class="btn btn-sm" href="/inventario/ventas">{{ icon('receipt') }} Ventas del mes</a><a class="btn btn-sm" href="/inventario">{{ icon('chev-left') }} Inventario</a>{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Registrar venta</h1></div></div>
+
+<form method="post" action="/inventario/venta" class="sale" data-sale>
+  <div class="card">
+    <div class="card-head"><h2>Productos</h2></div>
+    <div class="sale-lines" data-lines></div>
+    <div class="card-body" style="padding-top:0">
+      <button type="button" class="btn btn-sm" data-add-line>{{ icon('plus') }} Agregar otro producto</button>
+    </div>
+  </div>
+
+  <div class="card card-pad sale-side">
+    <div class="charge-label" style="margin-top:0">Cliente (opcional)</div>
+    <div class="form-grid">
+      <div class="field"><select name="patient_id"><option value="">Venta de mostrador</option>{% for pt in patients %}<option value="{{ pt.id }}">{{ pt.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><input type="text" name="customer" placeholder="O escribe el nombre (colega, clínica…)"></div>
+    </div>
+    <div class="charge-label">Forma de pago</div>
+    <div class="charge-methods sale-methods">
+      {% for m in cfg.PAYMENT_METHODS %}<label><input type="radio" name="method" value="{{ m }}" {{ 'checked' if loop.first }}><span>{{ m }}</span></label>{% endfor %}
+    </div>
+    <div class="sale-total">
+      <div><small>Total de la venta</small><b class="tnum" data-total>$0.00</b><span class="muted" data-profit></span></div>
+      <button class="btn btn-primary sale-submit" data-sale-submit disabled>{{ icon('wallet') }} <span>Cobrar venta</span></button>
+    </div>
+    <p class="hint" style="margin:8px 0 0">Se descuenta del depósito y se suma a tus ingresos de {{ month_name }}.</p>
+  </div>
+</form>
+
+<template data-line-tpl>
+  <div class="sale-line">
+    <div class="field sl-prod"><label>Producto</label>
+      <select name="product_id" required>
+        <option value="">Elige un producto…</option>
+        {% for p in products %}{% set av = p.sellable_stock %}<option value="{{ p.id }}" data-price="{{ p.sale_price }}" data-cost="{{ p.cost_price }}" data-stock="{{ av }}" data-unit="{{ p.unit }}" {{ 'disabled' if av <= 0 }}>{{ p.name }} · {{ av|qty }} {{ p.unit }}{{ (' (solo caducado)' if p.stock > 0 else ' (sin existencia)') if av <= 0 }}</option>{% endfor %}
+      </select></div>
+    <div class="field sl-qty"><label>Cantidad</label><input type="number" name="qty" min="0.01" step="0.01" value="1" required></div>
+    <div class="field sl-price"><label>Precio c/u</label><input type="number" name="price" min="0" step="0.01" required></div>
+    <div class="sl-sub"><small class="muted">Subtotal</small><b class="tnum" data-sub>$0.00</b></div>
+    <button type="button" class="btn btn-xs btn-ghost btn-danger sl-del" data-del-line aria-label="Quitar producto">{{ icon('x') }}</button>
+    <div class="sl-warn" data-warn hidden></div>
+  </div>
+</template>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const form = document.querySelector("[data-sale]"), lines = form.querySelector("[data-lines]");
+  const tpl = document.querySelector("[data-line-tpl]");
+  const fmt = (n) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+  const total = form.querySelector("[data-total]"), profit = form.querySelector("[data-profit]");
+  const submit = form.querySelector("[data-sale-submit]");
+  const recalc = () => {
+    let sum = 0, cost = 0, bad = false, any = false;
+    const used = {};
+    lines.querySelectorAll(".sale-line").forEach((ln) => {
+      const sel = ln.querySelector("select"), opt = sel.selectedOptions[0];
+      const q = Number(ln.querySelector('[name="qty"]').value) || 0, pr = Number(ln.querySelector('[name="price"]').value) || 0;
+      const warn = ln.querySelector("[data-warn]");
+      ln.querySelector("[data-sub]").textContent = fmt(q * pr);
+      warn.hidden = true;
+      if (!sel.value) return;
+      any = true;
+      used[sel.value] = (used[sel.value] || 0) + q;
+      const stock = Number(opt.dataset.stock);
+      if (used[sel.value] > stock + 1e-9) { warn.hidden = false; warn.textContent = `Solo hay ${stock} ${opt.dataset.unit} vigentes en el depósito.`; bad = true; }
+      sum += q * pr; cost += q * Number(opt.dataset.cost || 0);
+    });
+    total.textContent = fmt(sum);
+    profit.textContent = sum ? ` · ganancia aprox. ${fmt(sum - cost)}` : "";
+    submit.disabled = !any || bad || sum <= 0;
+    submit.querySelector("span").textContent = sum ? `Cobrar venta ${fmt(sum)}` : "Cobrar venta";
+  };
+  const add = (pid) => {
+    const ln = tpl.content.firstElementChild.cloneNode(true);
+    lines.appendChild(ln);
+    const sel = ln.querySelector("select");
+    sel.addEventListener("change", () => { const o = sel.selectedOptions[0]; ln.querySelector('[name="price"]').value = o.dataset.price || ""; recalc(); });
+    if (pid) { sel.value = pid; sel.dispatchEvent(new Event("change")); }
+    ln.querySelector("[data-del-line]").addEventListener("click", () => { if (lines.children.length > 1) { ln.remove(); recalc(); } });
+    return ln;
+  };
+  form.addEventListener("input", recalc);
+  form.querySelector("[data-add-line]").addEventListener("click", () => add().querySelector("select").focus());
+  form.addEventListener("submit", () => { submit.disabled = true; });
+  add(new URLSearchParams(location.search).get("producto"));
+  recalc();
+})();
+</script>
+{% endblock %}

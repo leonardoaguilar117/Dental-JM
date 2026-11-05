@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Ventas del depósito{% endblock %}
+{% block topactions %}<a class="btn btn-sm" href="/inventario">{{ icon('chev-left') }} Inventario</a><a class="btn btn-sm btn-primary" href="/inventario/venta">{{ icon('plus') }} Registrar venta</a>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Ventas del depósito</h1><p>{{ month_name|capitalize }} {{ year }}</p></div>
+  <div class="actions"><form method="get"><input type="month" name="mes" value="{{ mes }}" onchange="this.form.submit()" style="width:auto" class="btn"></form></div>
+</div>
+
+<div class="grid g-4 mb">
+  <div class="card kpi"><div class="label">Vendido</div><div class="value">{{ total|money0 }}</div><div class="sub">{{ tickets|length }} venta(s)</div></div>
+  <div class="card kpi"><div class="label">Costo de lo vendido</div><div class="value">{{ cost|money0 }}</div><div class="sub">A precio de compra</div></div>
+  <div class="card kpi"><div class="label">Ganancia</div><div class="value" style="color:var(--ok)">{{ (total - cost)|money0 }}</div><div class="sub">{{ ((total - cost) / total * 100)|round(0)|int if total else 0 }}% de margen</div></div>
+  <div class="card kpi"><div class="label">Compras al depósito</div><div class="value">{{ purchases|money0 }}</div><div class="sub">Registradas como egreso</div></div>
+</div>
+
+<div class="card">
+  {% if tickets %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Fecha</th><th>Folio</th><th>Cliente</th><th>Productos</th><th>Pago</th><th class="num">Total</th><th></th></tr></thead>
+    <tbody>{% for tk in tickets %}
+      <tr><td>{{ tk.date|fecha('fechahora') }}</td><td class="tnum">{{ tk.code }}</td><td>{{ tk.customer }}</td>
+        <td>{% for m in tk.lines %}{{ m.product.name }} <span class="muted">×{{ (-m.quantity)|qty }}</span>{{ ', ' if not loop.last }}{% endfor %}</td>
+        <td>{{ tk.method or '—' }}</td><td class="num"><b>{{ tk.total|money }}</b></td>
+        <td class="num">{% if tk.ticket %}<a class="btn btn-xs" href="/inventario/ventas/{{ tk.ticket }}" title="Nota de venta">{{ icon('receipt') }}</a>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+    <tfoot><tr><td colspan="5" class="num"><b>Total</b></td><td class="num"><b>{{ total|money }}</b></td><td></td></tr></tfoot>
+  </table></div>
+  {% else %}<div class="empty">{{ icon('receipt') }}<div>Sin ventas en este mes.</div><a class="btn btn-primary mt" href="/inventario/venta">Registrar venta</a></div>{% endif %}
+</div>
+{% endblock %}

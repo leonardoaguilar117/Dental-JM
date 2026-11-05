@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Nuevo producto{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Nuevo producto</h1><p>Agrega un artículo al depósito. Si caduca, cada entrada pedirá lote y fecha de caducidad.</p></div></div>
-<form method="post" class="card card-pad" style="max-width:900px">
+<div class="page-head"><div><h1>Nuevo producto</h1></div></div>
+<form method="post" class="card card-pad" style="max-width:900px" data-buy-form>
   {% include "inventory/_product_fields.html" %}
   <hr class="section-sep">
   <fieldset>
     <legend>Existencia inicial (opcional)</legend>
-    <div class="form-grid-3">
+    <div class="form-grid">
       <div class="field"><label>Cantidad</label><input type="number" step="0.01" min="0" name="initial_qty" value="0"></div>
-      <div class="field"><label>Lote</label><input type="text" name="lot_code" placeholder="Ej. L24519"></div>
       <div class="field"><label>Caducidad</label><input type="date" name="expiry_date"></div>
     </div>
+    <label class="check buy-check"><input type="checkbox" name="as_expense" checked data-buy> La compré: registrar como egreso <b class="tnum" data-buy-total></b></label>
+    <div class="field" data-buy-method style="max-width:320px"><label>Forma de pago de la compra</label><select name="method">{% for m in cfg.PAYMENT_METHODS %}<option>{{ m }}</option>{% endfor %}</select></div>
   </fieldset>
   <div class="actions"><button class="btn btn-primary">Guardar producto</button><a class="btn" href="/inventario">Cancelar</a></div>
 </form>

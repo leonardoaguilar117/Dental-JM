@@ -66,7 +66,7 @@ def discard_expired(db: Session, lot: Lot, user_id: int) -> None:
     if lot.quantity <= 0:
         return
     db.add(Movement(product_id=lot.product_id, lot_id=lot.id, kind="merma", quantity=-lot.quantity,
-                    unit_price=lot.unit_cost, reason=f"Baja por caducidad (lote {lot.lot_code})",
+                    unit_price=lot.unit_cost, reason="Baja por caducidad",
                     user_id=user_id, date=now_local()))
     lot.quantity = 0
 
