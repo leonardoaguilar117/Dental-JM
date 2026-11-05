@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import json
 import random
-import secrets
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import (Appointment, ClinicalNote, Expense, ExternalSpecialist, Lot, MedicalHistory, Movement,
+from .models import (Appointment, ClinicalNote, Expense, Lot, MedicalHistory, Movement,
                      Patient, Payment, Product, Reminder, Treatment, User)
 from .utils import add_months, hash_password, month_bounds, now_local, today_local
 
@@ -46,16 +45,11 @@ def seed_if_empty(db: Session) -> None:
 
     jimena = User(username="jimena", full_name="Dra. Jimena Juárez Aguilar", short_name="Dra. Jimena",
                   specialty="Ortodoncia", password_hash=hash_password("demo123"), color="#418d96",
-                  phone="5512345678", can_inventory=True, shared_expense_pct=50,
-                  ical_token=secrets.token_urlsafe(24))
+                  phone="5512345678", can_inventory=True, shared_expense_pct=50)
     carlos = User(username="carlos", full_name="Dr. Juan Carlos Montaño López", short_name="Dr. Juan Carlos",
                   specialty="Estética dental", password_hash=hash_password("demo123"), color="#6c4813",
-                  phone="5587654321", can_inventory=False, shared_expense_pct=50,
-                  ical_token=secrets.token_urlsafe(24))
-    maxilo = ExternalSpecialist(full_name="Dr. Ricardo Salinas Vega", specialty="Cirujano maxilofacial",
-                                phone="5544556677", email="maxilofacial@ejemplo.com", color="#737a90",
-                                availability_note="Martes y jueves por la tarde (confirmar por WhatsApp)")
-    db.add_all([jimena, carlos, maxilo])
+                  phone="5587654321", can_inventory=False, shared_expense_pct=50)
+    db.add_all([jimena, carlos])
     db.flush()
     docs = [jimena, carlos]
 
@@ -70,7 +64,6 @@ def seed_if_empty(db: Session) -> None:
                     address=f"Calle {rnd.choice(['Roble', 'Pino', 'Cedro', 'Fresno', 'Encino'])} #{rnd.randint(10, 300)}, CDMX",
                     occupation=occ, primary_doctor_id=docs[d].id,
                     emergency_contact=("Mamá / Papá · 55" + str(rnd.randint(10000000, 99999999))) if age < 18 else "",
-                    referred_by=rnd.choice(["Instagram", "Recomendación", "Google Maps", "Facebook", ""]),
                     created_at=now - timedelta(days=rnd.randint(20, 200)))
         db.add(p)
         db.flush()
@@ -151,12 +144,12 @@ def seed_if_empty(db: Session) -> None:
                 first = False
                 pay_date += timedelta(days=rnd.randint(20, 35))
 
-    # Cirugía de terceros molares con el maxilofacial
+    # Extracción de terceros molares previo a ortodoncia
     p_cx = patients[2][0]
-    t_cx = Treatment(patient_id=p_cx.id, doctor_id=jimena.id, external_id=maxilo.id,
+    t_cx = Treatment(patient_id=p_cx.id, doctor_id=jimena.id,
                      name="Extracción de terceros molares (4) previo a ortodoncia", total=9500,
-                     external_fee=6000, sessions_planned=2, sessions_done=0, status="en proceso",
-                     created_at=now - timedelta(days=10), description="Cirugía a cargo del Dr. Salinas (maxilofacial); control post-quirúrgico con la Dra. Jimena")
+                     sessions_planned=2, sessions_done=0, status="en proceso",
+                     created_at=now - timedelta(days=10), description="Extracción y control post-quirúrgico")
     db.add(t_cx)
     db.flush()
     db.add(Payment(treatment_id=t_cx.id, patient_id=p_cx.id, doctor_id=jimena.id, amount=4000,
@@ -196,17 +189,17 @@ def seed_if_empty(db: Session) -> None:
                                               if typ == "Ajuste de ortodoncia" else
                                               "Procedimiento sin complicaciones. Se dan indicaciones post-tratamiento."),
                                         next_step="Control en 4 semanas" if di == 0 else "Revisión en 15 días"))
-    # cita de cirugía con el maxilofacial (jueves próximo, tarde)
+    # citas de cirugía (jueves próximo, tarde)
     d_cx = today + timedelta(days=(3 - today.weekday()) % 7 or 7)
     s_cx = datetime.combine(d_cx, datetime.min.time()).replace(hour=16)
-    db.add(Appointment(patient_id=p_cx.id, doctor_id=jimena.id, external_id=maxilo.id, start=s_cx,
+    db.add(Appointment(patient_id=p_cx.id, doctor_id=jimena.id, start=s_cx,
                        end=s_cx + timedelta(minutes=120), type="Extracción / cirugía", status="confirmada",
                        notes="Extracción de 18, 28, 38, 48 bajo anestesia local. Traer radiografía panorámica."))
     p_cx2 = patients[10][0]
     s_cx2 = s_cx + timedelta(days=5, hours=1)
     if s_cx2.weekday() == 6:
         s_cx2 += timedelta(days=1)
-    db.add(Appointment(patient_id=p_cx2.id, doctor_id=carlos.id, external_id=maxilo.id, start=s_cx2,
+    db.add(Appointment(patient_id=p_cx2.id, doctor_id=carlos.id, start=s_cx2,
                        end=s_cx2 + timedelta(minutes=90), type="Extracción / cirugía", status="programada",
                        notes="Valoración y extracción de tercer molar inferior"))
 
@@ -253,9 +246,6 @@ def seed_if_empty(db: Session) -> None:
             if amt and s.replace(day=min(day, 28)) <= today:
                 db.add(Expense(date=d(day), concept=concept, category=cat, amount=amt, owner_id=owner.id,
                                created_by_id=owner.id, method=rnd.choice(["Tarjeta crédito", "Transferencia"])))
-    db.add(Expense(date=today - timedelta(days=9), concept="Honorarios Dr. Salinas · Extracción terceros molares",
-                   category="Honorarios especialista", amount=6000, owner_id=jimena.id, created_by_id=jimena.id,
-                   method="Efectivo"))
 
     # ---------- Inventario (depósito de la Dra. Jimena) ----------
     products = [
@@ -290,8 +280,7 @@ def seed_if_empty(db: Session) -> None:
             sale = 340
         pr = Product(owner_id=jimena.id, sku=sku, name=name, category=cat, brand=brand, unit=unit, min_stock=mn,
                      cost_price=cost, sale_price=sale, tracks_expiry=exp,
-                     supplier=rnd.choice(["Depósito Dental Villa de Cortés", "Dentalia Proveedores", "OrthoMex"]),
-                     location=rnd.choice(["Vitrina A", "Vitrina B", "Gaveta 1", "Gaveta 2", "Almacén"]))
+                     supplier=rnd.choice(["Depósito Dental Villa de Cortés", "Dentalia Proveedores", "OrthoMex"]))
         db.add(pr)
         db.flush()
         for qty, days in lots:
