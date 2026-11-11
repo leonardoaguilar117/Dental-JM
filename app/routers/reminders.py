@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Patient, Reminder, User
 from ..services import notifications
-from ..utils import now_local, parse_date, whatsapp_link
+from ..utils import now_local, parse_date, safe_next, to_int, whatsapp_link
 from ..web import current_user, flash, redirect, render
 
 router = APIRouter(prefix="/recordatorios")
@@ -32,21 +32,22 @@ def list_reminders(request: Request, estado: str = "pendiente", db: Session = De
 async def create(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
     f = await request.form()
     due = parse_date(f.get("due_date"))
-    if not due or not f.get("patient_id"):
+    pid = to_int(f.get("patient_id"))
+    if not due or not pid or not db.get(Patient, pid):
         flash(request, "Paciente y fecha son obligatorios.", "error")
         return redirect("/recordatorios")
-    db.add(Reminder(patient_id=int(f["patient_id"]), doctor_id=user.id, due_date=due,
-                    kind=str(f.get("kind") or "Otro"), message=str(f.get("message", "")).strip()))
+    db.add(Reminder(patient_id=pid, doctor_id=user.id, due_date=due,
+                    kind=str(f.get("kind") or "Otro")[:80], message=str(f.get("message", "")).strip()[:500]))
     db.commit()
     flash(request, "Recordatorio creado.")
-    return redirect(str(f.get("next") or "/recordatorios"))
+    return redirect(safe_next(f.get("next"), "/recordatorios"))
 
 
 @router.post("/{rid}/{accion}")
 async def action(rid: int, accion: str, request: Request, db: Session = Depends(get_db),
                  user: User = Depends(current_user)):
     r = db.get(Reminder, rid)
-    if not r:
+    if not r or r.doctor_id != user.id:  # cada doctor gestiona solo sus recordatorios
         raise HTTPException(404)
     f = await request.form()
     mapping = {"enviado": "enviado", "completar": "completado", "descartar": "descartado", "reabrir": "pendiente"}
@@ -57,4 +58,4 @@ async def action(rid: int, accion: str, request: Request, db: Session = Depends(
         r.sent_at = now_local()
     db.commit()
     flash(request, f"Recordatorio de {r.patient.full_name} marcado como {r.status}.")
-    return redirect(str(f.get("next") or "/recordatorios"))
+    return redirect(safe_next(f.get("next"), "/recordatorios"))

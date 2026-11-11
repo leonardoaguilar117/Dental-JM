@@ -2,20 +2,31 @@
 {% block title %}Historia clínica · {{ p.full_name }}{% endblock %}
 {% block topactions %}<button class="btn btn-sm btn-primary" onclick="window.print()">{{ icon('printer') }} Imprimir / guardar PDF</button>{% endblock %}
 {% block content %}
+{% set doc = p.primary_doctor %}
 <div class="print-sheet">
   <div class="doc-head">
-    <div><h1>Historia clínica odontológica</h1><small class="muted">Consultorio Dental JM · Expediente #{{ '%05d'|format(p.id) }}</small></div>
-    <div style="text-align:right"><b>{{ p.primary_doctor.full_name if p.primary_doctor }}</b><br><small class="muted">{{ p.primary_doctor.specialty if p.primary_doctor }}</small><br><small class="muted">Impreso: {{ today()|fecha }}</small></div>
+    <div><h1>Historia clínica odontológica</h1>
+      <small class="muted"><b>{{ cfg.CLINIC_NAME }}</b>{% if cfg.CLINIC_RAZON_SOCIAL %} · {{ cfg.CLINIC_RAZON_SOCIAL }}{% endif %}</small><br>
+      {% if cfg.CLINIC_ADDRESS %}<small class="muted">{{ cfg.CLINIC_ADDRESS }}{% if cfg.CLINIC_PHONE %} · Tel. {{ cfg.CLINIC_PHONE }}{% endif %}</small><br>{% endif %}
+      {% if cfg.CLINIC_LICENCIA %}<small class="muted">Aviso de funcionamiento / licencia sanitaria: {{ cfg.CLINIC_LICENCIA }}</small><br>{% endif %}
+      {% if cfg.CLINIC_RESPONSABLE %}<small class="muted">Responsable sanitario: {{ cfg.CLINIC_RESPONSABLE }}{% if cfg.CLINIC_RESPONSABLE_CEDULA %} · Céd. prof. {{ cfg.CLINIC_RESPONSABLE_CEDULA }}{% endif %}</small><br>{% endif %}
+      <small class="muted">Expediente #{{ '%05d'|format(p.id) }} · Apertura: {{ p.created_at|fecha }} · NOM-004-SSA3-2012 / NOM-013-SSA2-2015</small></div>
+    <div style="text-align:right"><b>{{ doc.full_name if doc }}</b><br><small class="muted">{{ doc.specialty if doc }}</small><br>
+      <small class="muted">{% if doc and doc.cedula %}Céd. prof. {{ doc.cedula }}{% else %}Céd. prof. ________{% endif %}{% if doc and doc.cedula_especialidad %} · Céd. esp. {{ doc.cedula_especialidad }}{% endif %}</small><br>
+      {% if doc and doc.universidad %}<small class="muted">{{ doc.universidad }}</small><br>{% endif %}
+      <small class="muted">Impreso: {{ today()|fecha }}</small></div>
   </div>
   <h3>Ficha de identificación</h3>
   <dl>
     <dt>Nombre</dt><dd>{{ p.full_name }}</dd>
-    <dt>Fecha de nacimiento / edad</dt><dd>{{ p.birth_date|fecha }} · {{ p.age }} años</dd>
-    <dt>Sexo</dt><dd>{{ p.sex or '—' }}</dd>
+    <dt>Fecha de nacimiento / edad</dt><dd>{{ p.birth_date|fecha }} · {{ p.age if p.age is not none else '—' }} años</dd>
+    <dt>Sexo / estado civil</dt><dd>{{ p.sex or '—' }} · {{ p.estado_civil or '—' }}</dd>
+    <dt>CURP</dt><dd>{{ p.curp or '—' }}</dd>
+    <dt>Lugar de nacimiento</dt><dd>{{ p.lugar_nacimiento or '—' }}</dd>
     <dt>Ocupación</dt><dd>{{ p.occupation or '—' }}</dd>
     <dt>Domicilio</dt><dd>{{ p.address or '—' }}</dd>
     <dt>Teléfono / correo</dt><dd>{{ p.phone or '—' }} · {{ p.email or '—' }}</dd>
-    {% if p.emergency_contact %}<dt>Contacto de emergencia</dt><dd>{{ p.emergency_contact }}</dd>{% endif %}
+    {% if p.emergency_contact %}<dt>Contacto de emergencia / tutor</dt><dd>{{ p.emergency_contact }}</dd>{% endif %}
   </dl>
   <h3>Interrogatorio</h3>
   <dl>
@@ -24,34 +35,45 @@
     <dt>Heredofamiliares</dt><dd>{{ h.antecedentes_heredofamiliares or '—' }}</dd>
     <dt>Personales patológicos</dt><dd>{{ h.antecedentes_patologicos or '—' }}</dd>
     <dt>No patológicos</dt><dd>{{ h.antecedentes_no_patologicos or '—' }}</dd>
+    <dt>Grupo sanguíneo y Rh</dt><dd>{{ h.grupo_sanguineo or '—' }}</dd>
     <dt>Alergias</dt><dd>{{ h.alergias or '—' }}</dd>
     <dt>Medicamentos</dt><dd>{{ h.medicamentos or '—' }}</dd>
     <dt>Condiciones sistémicas</dt><dd>{% set c = [] %}{% for k,l in [('diabetes','Diabetes'),('hipertension','Hipertensión'),('cardiopatia','Cardiopatía'),('coagulacion','Coagulopatía'),('embarazo','Embarazo'),('fumador','Tabaquismo'),('bruxismo','Bruxismo')] %}{% if h[k] %}{% set _ = c.append(l) %}{% endif %}{% endfor %}{{ c|join(', ') or 'Ninguna referida' }}</dd>
-    <dt>Presión arterial</dt><dd>{{ h.presion_arterial or '—' }}</dd>
+    {% set ap = h.aparatos %}
+    {% for key, label in cfg.APARATOS %}<dt>Aparato {{ label|lower }}</dt><dd>{{ ap.get(key) or 'Sin datos' }}</dd>{% endfor %}
   </dl>
-  <h3>Exploración</h3>
+  <h3>Exploración física</h3>
   <dl>
-    <dt>Extraoral</dt><dd>{{ h.exploracion_extraoral or '—' }}</dd>
+    <dt>Habitus exterior</dt><dd>{{ h.habitus_exterior or '—' }}</dd>
+    <dt>Signos vitales</dt><dd>TA {{ h.presion_arterial or '—' }} · FC {{ h.frecuencia_cardiaca or '—' }} · FR {{ h.frecuencia_respiratoria or '—' }} · Temp. {{ h.temperatura or '—' }} · Peso {{ h.peso or '—' }} · Talla {{ h.talla or '—' }}</dd>
+    <dt>Cabeza y cuello (extraoral)</dt><dd>{{ h.exploracion_extraoral or '—' }}</dd>
+    <dt>ATM</dt><dd>{{ h.exploracion_atm or '—' }}</dd>
     <dt>Intraoral</dt><dd>{{ h.exploracion_intraoral or '—' }}</dd>
-    <dt>Higiene / oclusión</dt><dd>{{ h.higiene_oral or '—' }} · {{ h.oclusion or '—' }}</dd>
+    <dt>Higiene / placa / oclusión</dt><dd>{{ h.higiene_oral or '—' }} · {{ h.indice_placa or '—' }} · {{ h.oclusion or '—' }}</dd>
     <dt>Lengua</dt><dd>{{ h.lengua_list|join(', ') or 'Sin afectaciones' }}{% if h.lengua_notas %}. {{ h.lengua_notas }}{% endif %}</dd>
     <dt>Encía y periodonto</dt><dd>{{ h.encia_list|join(', ') or 'Sin afectaciones' }}{% if h.encia_notas %}. {{ h.encia_notas }}{% endif %}</dd>
   </dl>
   <h3>Odontograma</h3>
   {% with readonly=True %}{% include "patients/_odontogram.html" %}{% endwith %}
-  <h3>Diagnóstico, plan y pronóstico</h3>
+  {% set cp = h.cpod %}<p><small>Índice CPOD: <b>{{ cp.total }}</b> (cariados {{ cp.c }}, perdidos {{ cp.p }}, obturados {{ cp.o }})</small></p>
+  <h3>Estudios, diagnóstico, pronóstico e indicación terapéutica</h3>
   <dl>
+    <dt>Estudios de laboratorio y gabinete</dt><dd>{{ h.estudios_complementarios or 'Ninguno aportado' }}</dd>
     <dt>Diagnóstico</dt><dd>{{ h.diagnostico or '—' }}</dd>
-    <dt>Plan de tratamiento</dt><dd>{{ h.plan_tratamiento or '—' }}</dd>
     <dt>Pronóstico</dt><dd>{{ h.pronostico or '—' }}</dd>
+    <dt>Plan de tratamiento e indicación terapéutica</dt><dd>{{ h.plan_tratamiento or '—' }}</dd>
     <dt>Consentimiento informado</dt><dd>{% if h.consentimiento_firmado %}Firmado{% if h.consentimiento_fecha %} el {{ h.consentimiento_fecha|fecha('fechahora') }}{% endif %}{% if h.consentimiento_nombre %} por {{ h.consentimiento_nombre }}{% endif %}{% else %}Pendiente{% endif %}</dd>
+    <dt>Aviso de privacidad</dt><dd>{% if h.aviso_privacidad %}Entregado y aceptado{% if h.aviso_privacidad_fecha %} el {{ h.aviso_privacidad_fecha|fecha }}{% endif %}{% else %}Pendiente{% endif %}</dd>
   </dl>
   {% if p.notes_list %}
   <h3>Notas de evolución</h3>
-  <table class="table"><thead><tr><th>Fecha</th><th>Procedimiento</th><th>Nota</th><th>Doctor</th></tr></thead><tbody>
-  {% for n in p.notes_list[:15] %}<tr><td>{{ n.date|fecha }}</td><td>{{ n.procedure }}</td><td>{{ n.note }}</td><td>{{ n.doctor.short_name }}</td></tr>{% endfor %}
+  <table class="table"><thead><tr><th>Fecha y hora</th><th>Tipo / procedimiento</th><th>Nota, diagnóstico e indicaciones</th><th>Médico</th></tr></thead><tbody>
+  {% for n in p.notes_list %}<tr><td>{{ n.date|fecha('fechahora') }}</td><td>{{ n.kind or 'Evolución' }}<br>{{ n.procedure }}</td>
+    <td>{% if n.vitals %}<small>SV: {{ n.vitals }}</small><br>{% endif %}{{ n.note }}{% if n.diagnosis %}<br><b>Dx:</b> {{ n.diagnosis }}{% endif %}{% if n.studies %}<br><b>Estudios:</b> {{ n.studies }}{% endif %}{% if n.indications %}<br><b>Indicaciones:</b> {{ n.indications }}{% endif %}</td>
+    <td>{{ n.doctor.full_name }}{% if n.doctor.cedula %}<br>Céd. {{ n.doctor.cedula }}{% endif %}</td></tr>{% endfor %}
   </tbody></table>
   {% endif %}
-  <div class="signature"><div>{% if h.consentimiento_firma %}<img class="sig-img" src="{{ h.consentimiento_firma }}" alt="Firma"><br>{{ h.consentimiento_nombre }}<br>{% endif %}Firma del paciente o tutor</div><div>{{ p.primary_doctor.full_name if p.primary_doctor }}<br>Céd. prof. ________</div></div>
+  <div class="signature"><div>{% if h.consentimiento_firma %}<img class="sig-img" src="{{ h.consentimiento_firma }}" alt="Firma"><br>{{ h.consentimiento_nombre }}<br>{% endif %}Firma del paciente o tutor</div><div>{{ doc.full_name if doc }}<br>Céd. prof. {{ doc.cedula if doc and doc.cedula else '________' }}</div></div>
+  <p style="margin-top:14px"><small class="muted">Expediente confidencial. Conservar al menos {{ cfg.RETENTION_YEARS }} años a partir del último acto médico (NOM-004-SSA3-2012, 5.4). Datos personales protegidos conforme al aviso de privacidad.</small></p>
 </div>
 {% endblock %}

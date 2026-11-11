@@ -11,7 +11,7 @@ from .. import config
 from ..database import get_db
 from ..models import Expense, Lot, Movement, Patient, Product, User
 from ..services import inventory as inv
-from ..utils import MESES, month_bounds, now_local, parse_date, to_float, today_local
+from ..utils import MESES, month_bounds, now_local, parse_date, safe_next, to_float, to_int, today_local
 from ..services import finance
 from ..web import flash, inventory_user, redirect, render
 
@@ -155,14 +155,14 @@ async def exit_(pid: int, request: Request, db: Session = Depends(get_db), user:
         inv.register_exit(db, p, to_float(f.get("quantity")), kind, user.id,
                           unit_price=to_float(f.get("unit_price")) or p.sale_price,
                           reason=str(f.get("reason", "")).strip(),
-                          patient_id=int(f["patient_id"]) if f.get("patient_id") else None)
+                          patient_id=to_int(f.get("patient_id")))
         db.commit()
         flash(request, {"uso": "Uso clínico registrado.", "venta": "Venta registrada (suma a tus ingresos).",
                         "merma": "Merma registrada."}[kind])
     except inv.StockError as e:
         db.rollback()
         flash(request, str(e), "error")
-    return redirect(str(f.get("next") or f"/inventario/producto/{pid}"))
+    return redirect(safe_next(f.get("next"), f"/inventario/producto/{pid}"))
 
 
 @router.post("/lote/{lid}/baja")
@@ -234,7 +234,7 @@ async def create_sale(request: Request, db: Session = Depends(get_db), user: Use
     prefix = f"V{now:%y%m%d}-"
     n = len(set(db.scalars(select(Movement.ticket).where(Movement.ticket.like(prefix + "%"))).all()))
     ticket = f"{prefix}{n + 1:03d}"
-    pid_patient = int(f["patient_id"]) if str(f.get("patient_id") or "").isdigit() else None
+    pid_patient = to_int(f.get("patient_id"))
     customer = str(f.get("customer", "")).strip()[:120]
     method = str(f.get("method") or "Efectivo")
     total = 0.0

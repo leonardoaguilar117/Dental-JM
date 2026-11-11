@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
+import secrets
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import config
 from .models import (Appointment, ClinicalNote, Expense, Lot, MedicalHistory, Movement,
                      Patient, Payment, Product, Reminder, Treatment, User)
 from .utils import add_months, hash_password, month_bounds, now_local, today_local
@@ -39,15 +42,20 @@ LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
 def seed_if_empty(db: Session) -> None:
     if db.scalar(select(User.id).limit(1)):
         return
+    # Nunca una contraseña pública en producción: DEMO_PASSWORD, o una aleatoria que se muestra una sola vez en el log
+    pwd = config.DEMO_PASSWORD or ("demo123" if not config.IS_PRODUCTION else secrets.token_urlsafe(12))
+    if config.IS_PRODUCTION and not config.DEMO_PASSWORD:
+        logging.getLogger("seed").warning("Usuarios iniciales jimena y carlos creados. Contraseña temporal: %s "
+                                          "(cámbiala en Configuración)", pwd)
     rnd = random.Random(42)
     today = today_local()
     now = now_local()
 
     jimena = User(username="jimena", full_name="Dra. Jimena Juárez Aguilar", short_name="Dra. Jimena",
-                  specialty="Ortodoncia", password_hash=hash_password("demo123"), color="#418d96",
+                  specialty="Ortodoncia", password_hash=hash_password(pwd), color="#418d96",
                   phone="5512345678", can_inventory=True, shared_expense_pct=50)
     carlos = User(username="carlos", full_name="Dr. Juan Carlos Montaño López", short_name="Dr. Juan Carlos",
-                  specialty="Estética dental", password_hash=hash_password("demo123"), color="#6c4813",
+                  specialty="Estética dental", password_hash=hash_password(pwd), color="#6c4813",
                   phone="5587654321", can_inventory=False, shared_expense_pct=50)
     db.add_all([jimena, carlos])
     db.flush()

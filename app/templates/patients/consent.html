@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Consentimiento informado · {{ p.full_name }}{% endblock %}
+{% block topactions %}<button class="btn btn-sm btn-primary" onclick="window.print()">{{ icon('printer') }} Imprimir / guardar PDF</button>{% endblock %}
+{% block content %}
+{% set doc = p.primary_doctor %}
+<div class="print-sheet">
+  <div class="doc-head">
+    <div><h1>Carta de consentimiento informado</h1>
+      <small class="muted"><b>{{ cfg.CLINIC_NAME }}</b>{% if cfg.CLINIC_RAZON_SOCIAL %} · {{ cfg.CLINIC_RAZON_SOCIAL }}{% endif %}</small><br>
+      {% if cfg.CLINIC_ADDRESS %}<small class="muted">{{ cfg.CLINIC_ADDRESS }}</small><br>{% endif %}
+      <small class="muted">Expediente #{{ '%05d'|format(p.id) }}</small></div>
+    <div style="text-align:right"><small class="muted">Lugar y fecha:<br><b>{{ cfg.CLINIC_CITY }}, {{ (h.consentimiento_fecha or today())|fecha('larga') }}</b></small></div>
+  </div>
+  <dl>
+    <dt>Paciente</dt><dd>{{ p.full_name }}{% if p.age is not none %} · {{ p.age }} años{% endif %}</dd>
+    <dt>Médico tratante</dt><dd>{{ doc.full_name if doc }}{% if doc and doc.cedula %} · Céd. prof. {{ doc.cedula }}{% endif %}</dd>
+    <dt>Acto médico autorizado</dt><dd>{{ h.consentimiento_acto or h.plan_tratamiento or '—' }}</dd>
+    <dt>Riesgos y beneficios</dt><dd>{{ h.consentimiento_riesgos or '—' }}</dd>
+  </dl>
+  <p>Yo, <b>{{ h.consentimiento_nombre or p.full_name }}</b>, en calidad de <b>{{ h.consentimiento_calidad or 'Paciente' }}</b>, declaro que el médico me explicó
+    en términos claros el diagnóstico, el plan de tratamiento, sus alternativas, los riesgos, beneficios y costos; que resolvió mis dudas, y
+    <b>autorizo</b> la atención descrita, así como los procedimientos adicionales que sean necesarios ante una contingencia o urgencia derivada
+    del acto médico. Entiendo que puedo revocar este consentimiento en cualquier momento (NOM-004-SSA3-2012, 10.1).</p>
+  <div class="signature">
+    <div>{% if h.consentimiento_firma %}<img class="sig-img" src="{{ h.consentimiento_firma }}" alt="Firma"><br>{% endif %}{{ h.consentimiento_nombre or p.full_name }}<br>Firma de quien autoriza</div>
+    <div>{{ doc.full_name if doc }}<br>Céd. prof. {{ doc.cedula if doc and doc.cedula else '________' }}<br>Firma del médico</div>
+  </div>
+  <div class="signature" style="margin-top:36px">
+    <div>{{ h.consentimiento_testigo1 or '' }}<br>Testigo 1 (nombre y firma)</div>
+    <div>{{ h.consentimiento_testigo2 or '' }}<br>Testigo 2 (nombre y firma)</div>
+  </div>
+</div>
+{% endblock %}

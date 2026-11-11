@@ -9,7 +9,7 @@ from .. import config
 from ..database import get_db
 from ..models import Appointment, ClinicalNote, Patient, Reminder, Treatment, User
 from ..services import gcal, notifications
-from ..utils import fecha, now_local, parse_datetime, whatsapp_link
+from ..utils import fecha, now_local, parse_datetime, safe_next, to_int, whatsapp_link
 from ..web import current_user, flash, redirect, render
 
 router = APIRouter()
@@ -58,6 +58,8 @@ def agenda(request: Request, db: Session = Depends(get_db), user: User = Depends
 def api_events(start: str, end: str, doctores: str = "",
                db: Session = Depends(get_db), user: User = Depends(current_user)):
     s, e = parse_datetime(start), parse_datetime(end)
+    if not s or not e:
+        raise HTTPException(400, "Rango de fechas inválido")
     q = select(Appointment).where(Appointment.start < e, Appointment.end > s)
     ids = [int(x) for x in doctores.split(",") if x.isdigit()]
     if ids:
@@ -90,19 +92,22 @@ def new_appointment(request: Request, start: str = "", paciente: int | None = No
 async def create_appointment(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
     f = await request.form()
     start = parse_datetime(f.get("start"))
-    duration = int(f.get("duration") or 60)
-    if not start or not f.get("patient_id"):
+    duration = min(max(to_int(f.get("duration"), 60) or 60, 5), 480)
+    pid = to_int(f.get("patient_id"))
+    if not start or not pid or not db.get(Patient, pid):
         flash(request, "Selecciona paciente, fecha y hora.", "error")
         return redirect("/citas/nueva")
     end = start + timedelta(minutes=duration)
-    doctor_id = int(f.get("doctor_id") or user.id)
+    doctor_id = to_int(f.get("doctor_id"), user.id)
+    if not db.get(User, doctor_id):
+        doctor_id = user.id
     conflicts = _conflicts(db, start, end, doctor_id)
     if conflicts and f.get("force") != "1":
         flash(request, "Conflicto de horario: " + " ".join(conflicts) +
               " Marca «Agendar de todos modos» si es intencional.", "error")
         return render(request, "appointments/form.html", db, user, a=None, start=start,
-                      patient_id=int(f.get("patient_id")), prefill=dict(f), **_form_ctx(db))
-    a = Appointment(patient_id=int(f["patient_id"]), doctor_id=doctor_id, external_id=None,
+                      patient_id=pid, prefill=dict(f), **_form_ctx(db))
+    a = Appointment(patient_id=pid, doctor_id=doctor_id, external_id=None,
                     start=start, end=end, type=str(f.get("type") or "Valoración"),
                     notes=str(f.get("notes", "")).strip(), status="programada")
     db.add(a)
@@ -141,9 +146,11 @@ async def update_appointment(aid: int, request: Request, db: Session = Depends(g
         raise HTTPException(404)
     f = await request.form()
     start = parse_datetime(f.get("start")) or a.start
-    duration = int(f.get("duration") or a.duration_min)
+    duration = min(max(to_int(f.get("duration"), a.duration_min) or a.duration_min, 5), 480)
     end = start + timedelta(minutes=duration)
-    doctor_id = int(f.get("doctor_id") or a.doctor_id)
+    doctor_id = to_int(f.get("doctor_id"), a.doctor_id)
+    if not db.get(User, doctor_id):
+        doctor_id = a.doctor_id
     conflicts = _conflicts(db, start, end, doctor_id, exclude_id=a.id)
     if conflicts and f.get("force") != "1":
         flash(request, "Conflicto de horario: " + " ".join(conflicts), "error")
@@ -177,15 +184,16 @@ async def change_status(aid: int, request: Request, db: Session = Depends(get_db
     if status == "atendida":
         note_text = str(f.get("note", "")).strip()
         if note_text:
-            db.add(ClinicalNote(patient_id=a.patient_id, doctor_id=a.doctor_id, appointment_id=a.id,
-                                date=a.start, procedure=a.type, note=note_text,
-                                teeth=str(f.get("teeth", "")).strip(),
-                                next_step=str(f.get("next_step", "")).strip()))
+            db.add(ClinicalNote(patient_id=a.patient_id, doctor_id=user.id, appointment_id=a.id,
+                                date=min(a.start, now_local()), procedure=a.type, note=note_text[:5000],
+                                teeth=str(f.get("teeth", "")).strip()[:80],
+                                next_step=str(f.get("next_step", "")).strip()[:255]))
             msgs.append("Nota de evolución guardada.")
-        tid = f.get("treatment_id")
+        tid = to_int(f.get("treatment_id"))
         if tid:
-            t = db.get(Treatment, int(tid))
-            if t:
+            t = db.get(Treatment, tid)
+            # solo el tratamiento de este mismo paciente (y de este doctor: sus avances y montos son suyos)
+            if t and t.patient_id == a.patient_id and t.doctor_id == user.id:
                 t.sessions_done = min(t.sessions_done + 1, max(t.sessions_planned, t.sessions_done + 1))
                 if t.status == "presupuesto":
                     t.status = "en proceso"
@@ -193,7 +201,7 @@ async def change_status(aid: int, request: Request, db: Session = Depends(get_db
                     t.status = "terminado"
                 msgs.append(f"Avance de «{t.name}»: {t.sessions_done}/{t.sessions_planned} sesiones.")
         if f.get("create_reminder") == "on":
-            days = int(f.get("reminder_days") or 0)
+            days = min(to_int(f.get("reminder_days"), 0) or 0, 3650)
             if days > 0:
                 kind = config.REMINDER_RULES.get(a.type, (days, f"Seguimiento de {a.type.lower()}"))[1]
                 db.add(Reminder(patient_id=a.patient_id, doctor_id=a.doctor_id,
@@ -206,6 +214,6 @@ async def change_status(aid: int, request: Request, db: Session = Depends(get_db
         a.gcal_event_id = ev
     db.commit()
     flash(request, " ".join(msgs))
-    return redirect(str(f.get("next") or f"/citas/{aid}"))
+    return redirect(safe_next(f.get("next"), f"/citas/{aid}"))
 
 

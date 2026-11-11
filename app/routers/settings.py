@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
 from ..services import gcal
-from ..utils import hash_password, to_float, verify_password
+from ..utils import COLOR_RE, hash_password, to_float, valid_data_image, verify_password
 from ..web import current_user, flash, redirect, render
 
 router = APIRouter(prefix="/configuracion")
@@ -21,8 +21,13 @@ def settings(request: Request, db: Session = Depends(get_db), user: User = Depen
 @router.post("/perfil")
 async def profile(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
     f = await request.form()
-    user.phone = str(f.get("phone", "")).strip()
-    user.color = str(f.get("color") or user.color)
+    user.phone = str(f.get("phone", "")).strip()[:20]
+    color = str(f.get("color") or "")
+    if COLOR_RE.match(color):
+        user.color = color
+    user.cedula = str(f.get("cedula", "")).strip()[:20]
+    user.cedula_especialidad = str(f.get("cedula_especialidad", "")).strip()[:20]
+    user.universidad = str(f.get("universidad", "")).strip()[:120]
     db.commit()
     flash(request, "Perfil actualizado.")
     return redirect("/configuracion")
@@ -31,7 +36,7 @@ async def profile(request: Request, db: Session = Depends(get_db), user: User = 
 @router.post("/google")
 async def google_calendar(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
     f = await request.form()
-    user.gcal_calendar_id = str(f.get("gcal_calendar_id", "")).strip()
+    user.gcal_calendar_id = str(f.get("gcal_calendar_id", "")).strip()[:255]
     db.commit()
     flash(request, "Google Calendar vinculado." if user.gcal_calendar_id else "Google Calendar desvinculado.")
     return redirect("/configuracion#google")
@@ -42,7 +47,7 @@ async def split(request: Request, db: Session = Depends(get_db), user: User = De
     f = await request.form()
     doctors = db.scalars(select(User).order_by(User.id)).all()
     values = {d.id: to_float(f.get(f"pct_{d.id}")) for d in doctors}
-    if abs(sum(values.values()) - 100) > 0.01:
+    if any(v < 0 or v > 100 for v in values.values()) or abs(sum(values.values()) - 100) > 0.01:
         flash(request, "Los porcentajes deben sumar 100%.", "error")
         return redirect("/configuracion")
     for d in doctors:
@@ -58,8 +63,8 @@ async def password(request: Request, db: Session = Depends(get_db), user: User =
     new, confirm = str(f.get("new", "")), str(f.get("confirm", ""))
     if not verify_password(str(f.get("current", "")), user.password_hash):
         flash(request, "La contraseña actual no es correcta.", "error")
-    elif len(new) < 6:
-        flash(request, "La nueva contraseña debe tener al menos 6 caracteres.", "error")
+    elif len(new) < 10 or len(new) > 200 or new.lower() == user.username or new.isdigit():
+        flash(request, "La nueva contraseña debe tener al menos 10 caracteres, no ser solo números ni tu usuario.", "error")
     elif new != confirm:
         flash(request, "La confirmación no coincide con la nueva contraseña.", "error")
     elif verify_password(new, user.password_hash):
@@ -84,7 +89,7 @@ async def photo(request: Request, db: Session = Depends(get_db), user: User = De
         flash(request, "Foto eliminada.")
         return redirect("/configuracion#perfil")
     data = str(f.get("foto") or "")
-    if not data.startswith(PHOTO_PREFIXES) or len(data) > PHOTO_MAX:
+    if not valid_data_image(data, PHOTO_PREFIXES, PHOTO_MAX):
         flash(request, "No se pudo leer la imagen. Prueba con una foto JPG o PNG.", "error")
         return redirect("/configuracion#perfil")
     user.photo = data

@@ -8,12 +8,16 @@
   <fieldset>
     <legend>Datos personales</legend>
     <div class="form-grid">
-      <div class="field"><label>Nombre(s) *</label><input type="text" name="first_name" required value="{{ p.first_name if p }}"></div>
-      <div class="field"><label>Apellidos *</label><input type="text" name="last_name" required value="{{ p.last_name if p }}"></div>
+      <div class="field"><label>Nombre(s) *</label><input type="text" name="first_name" required maxlength="80" value="{{ p.first_name if p }}"></div>
+      <div class="field"><label>Apellidos *</label><input type="text" name="last_name" required maxlength="120" value="{{ p.last_name if p }}"></div>
       <div class="field"><label>Fecha de nacimiento</label><input type="date" name="birth_date" value="{{ p.birth_date if p and p.birth_date }}"></div>
       <div class="field"><label>Sexo</label>
         <select name="sex">{% for s in ['', 'Femenino', 'Masculino', 'Otro'] %}<option {{ 'selected' if p and p.sex == s }}>{{ s }}</option>{% endfor %}</select></div>
       <div class="field"><label>Ocupación</label><input type="text" name="occupation" value="{{ p.occupation if p }}"></div>
+      <div class="field"><label>CURP</label><input type="text" name="curp" value="{{ p.curp if p }}" maxlength="18" minlength="18" pattern="[A-Za-z]{4}[0-9]{6}[HMXhmx][A-Za-z]{2}[A-Za-z]{3}[A-Za-z0-9][0-9]" style="text-transform:uppercase" placeholder="18 caracteres (opcional)"></div>
+      <div class="field"><label>Estado civil</label>
+        <select name="estado_civil">{% for s in cfg.ESTADOS_CIVILES %}<option {{ 'selected' if p and p.estado_civil == s }}>{{ s }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Lugar de nacimiento</label><input type="text" name="lugar_nacimiento" maxlength="80" value="{{ p.lugar_nacimiento if p }}" placeholder="Ciudad, estado"></div>
     </div>
   </fieldset>
   <hr class="section-sep">
