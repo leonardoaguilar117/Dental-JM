@@ -110,6 +110,8 @@ function initCounters() {
     const money = el.dataset.money !== undefined;
     if (!isFinite(target)) return;
     const final = el.textContent;
+    el.textContent = fmt(0, money);  // arranca en cero y cuenta cuando termina la entrada desde el login
+    (window.jmAfterEnter || ((f) => f()))(() => {
     const t0 = performance.now(), dur = 650;
     const step = (now) => {
       const p = Math.min(1, (now - t0) / dur);
@@ -118,6 +120,7 @@ function initCounters() {
       if (p < 1) requestAnimationFrame(step); else el.textContent = final;
     };
     requestAnimationFrame(step);
+    });
   });
 }
 
@@ -145,39 +148,35 @@ document.addEventListener("click", (e) => {
   if (form) setTimeout(() => form.submit(), 400);
 });
 
-// ---- Temas: crossfade de toda la página con View Transitions ----
+// ---- Tema claro/oscuro: un solo botón; el tema nuevo se expande en círculo desde el botón ----
 function initThemePicker() {
-  document.querySelectorAll("[data-theme-pick]").forEach((pick) => {
-    const btn = pick.querySelector(".theme-btn");
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const open = pick.classList.toggle("open");
-      btn.setAttribute("aria-expanded", open);
-    });
-    pick.querySelectorAll("[data-set-theme]").forEach((opt) => opt.addEventListener("click", () => {
-      const key = opt.dataset.setTheme;
-      pick.classList.remove("open");
-      applyTheme(key, opt);
-    }));
-  });
-  document.addEventListener("click", () => document.querySelectorAll("[data-theme-pick].open").forEach((p) => p.classList.remove("open")));
+  document.querySelectorAll("[data-theme-toggle]").forEach((btn) => btn.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "noche" ? "lavanda" : "noche";
+    const r = btn.getBoundingClientRect();
+    applyTheme(next, r.left + r.width / 2, r.top + r.height / 2);
+  }));
 }
-function applyTheme(key, opt) {
+function applyTheme(key, x, y) {
   document.cookie = `jm_theme=${key}; path=/; max-age=31536000; samesite=lax`;
+  const root = document.documentElement;
   const swap = () => {
-    document.documentElement.dataset.theme = key;
-    document.querySelectorAll("[data-set-theme]").forEach((o) => o.setAttribute("aria-checked", o.dataset.setTheme === key));
-    document.querySelectorAll(".theme-btn").forEach((b) => {
-      const chips = opt.querySelectorAll(".chips i");
-      b.querySelectorAll(".dots i").forEach((d, i) => (d.style.background = chips[i]?.style.background));
-      const lbl = b.querySelector(".lbl"); if (lbl) lbl.textContent = opt.querySelector(".tname").firstChild.textContent.trim();
+    root.dataset.theme = key;
+    const dark = key === "noche";
+    document.querySelectorAll("[data-theme-toggle]").forEach((b) => {
+      b.setAttribute("aria-pressed", dark);
+      b.title = dark ? "Cambiar a tema claro" : "Cambiar a tema oscuro";
     });
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue("--frame").trim();
+    if (meta) meta.content = getComputedStyle(root).getPropertyValue("--frame").trim();
     window.dispatchEvent(new CustomEvent("themechange", { detail: key }));
   };
-  if (document.startViewTransition && !reduceMotion) document.startViewTransition(swap);
-  else swap();
+  if (!document.startViewTransition || reduceMotion) return swap();
+  // radio hasta la esquina más lejana, para que el círculo cubra toda la pantalla
+  const rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  root.style.setProperty("--tx", x + "px"); root.style.setProperty("--ty", y + "px"); root.style.setProperty("--tr", rad + "px");
+  root.classList.add("vt-theme");  // toda la página como una sola capa, sin piezas con nombre
+  const vt = document.startViewTransition(swap);
+  vt.finished.finally(() => root.classList.remove("vt-theme"));
 }
 // Lee un color del tema actual (para Chart.js y Three.js)
 window.themeColor = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();

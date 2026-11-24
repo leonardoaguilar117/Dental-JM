@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import config
 from ..database import get_db
 from ..models import User
 from ..utils import hash_password, verify_password
@@ -30,8 +31,10 @@ def _locked(key: tuple[str, str]) -> bool:
 def login_form(request: Request, db: Session = Depends(get_db)):
     if request.session.get("uid"):
         return redirect("/")
-    doctors = db.scalars(select(User).order_by(User.id)).all()
-    return render(request, "login.html", db, None, doctors=doctors)
+    # un solo acceso para todo el consultorio: cada quien escribe su usuario (la pantalla no lista las cuentas)
+    # la pista "demo123" solo se muestra donde esa es de verdad la contraseña (local sin DEMO_PASSWORD)
+    return render(request, "login.html", db, None, last_user=request.session.pop("_last_user", ""),
+                  demo_hint=not config.IS_PRODUCTION and not config.DEMO_PASSWORD)
 
 
 @router.post("/login")
@@ -49,6 +52,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
         n, _ = _fails.get(key, (0, 0.0))
         _fails[key] = (n + 1, time.time())
         flash(request, "Usuario o contraseña incorrectos.", "error")
+        request.session["_last_user"] = username[:50]  # el usuario se conserva para solo reescribir la contraseña
         return redirect("/login")
     _fails.pop(key, None)
     request.session.clear()

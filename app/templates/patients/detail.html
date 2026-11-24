@@ -31,7 +31,6 @@
     </div>
   </div>
   <div class="card-body row wrap" style="border-top:1px solid var(--line);gap:8px">
-    <a class="btn btn-sm" href="/citas/nueva?paciente={{ p.id }}">{{ icon('calendar') }} Agendar cita</a>
     {% if p.phone %}<a class="btn btn-sm btn-wa" href="{{ wa(p.phone, 'Hola ' ~ p.first_name ~ ', te saludamos del Consultorio Dental JM.') }}" target="_blank" rel="noopener">{{ icon('message') }} WhatsApp</a>{% endif %}
     <a class="btn btn-sm" href="/pacientes/{{ p.id }}/historia/imprimir" target="_blank">{{ icon('printer') }} Imprimir historia clínica</a>
     <a class="btn btn-sm" href="/pacientes/{{ p.id }}/editar">{{ icon('edit') }} Editar ficha</a>

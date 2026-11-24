@@ -20,7 +20,6 @@
       <p class="finding">Hoy: {% for f in finding %}<b>{{ f }}</b>{{ ' · ' if not loop.last }}{% endfor %}.</p>
       {% else %}<p class="finding">Todo al día: sin pendientes urgentes.</p>{% endif %}
       <div class="row wrap" style="gap:8px">
-        <a class="btn btn-sm btn-primary" href="/citas/nueva">{{ icon('calendar') }} Agendar cita</a>
         <a class="btn btn-sm btn-wa" href="/avisos">{{ icon('message') }} Enviar recordatorios</a>
       </div>
       <div class="controls">
@@ -217,7 +216,7 @@
 (() => { const sc = document.querySelector(".day-scroll"), now = document.querySelector(".now-line");
   if (sc && now && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth * 0.6); })();
 </script>
-<script type="module" src="/static/js/hero3d.js?v=3"></script>
+<script type="module">window.jmAfterEnter(() => import("/static/js/hero3d.js?v=3"));</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 const money = v => (v < 0 ? "-$" : "$") + Math.abs(Number(v)).toLocaleString("es-MX", {maximumFractionDigits: 0});
@@ -225,6 +224,7 @@ Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
 Chart.defaults.font.size = 12;
 const series = {{ chart|tojson }};
 const c = themeColor;
+window.jmAfterEnter(() => {
 const chart = new Chart(document.getElementById("chartSeries"), {
   type: "bar",
   data: { labels: series.labels, datasets: [
@@ -252,5 +252,6 @@ function paintChart() {
 }
 paintChart();
 window.addEventListener("themechange", paintChart);
+});
 </script>
 {% endblock %}
