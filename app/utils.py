@@ -146,7 +146,7 @@ def to_int(value, default: int | None = None) -> int | None:
 
 
 def safe_next(value, default: str) -> str:
-    """Solo rutas internas: evita redirecciones abiertas (//sitio.com, https://…, \sitio)."""
+    r"""Solo rutas internas: evita redirecciones abiertas (//sitio.com, https://…, \sitio)."""
     v = str(value or "")
     if v.startswith("/") and not v.startswith("//") and "\\" not in v and "\n" not in v and "\r" not in v:
         return v

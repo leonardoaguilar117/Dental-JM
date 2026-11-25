@@ -16,7 +16,13 @@ from .web import BASE_DIR, Forbidden, NotAuthenticated, redirect, templates
 logging.basicConfig(level=logging.INFO)
 
 if config.IS_PRODUCTION and config.SECRET_KEY == config.DEFAULT_SECRET:
-    raise RuntimeError("Define SECRET_KEY con un valor largo y aleatorio antes de iniciar en producción.")
+    # Nunca la clave de ejemplo en producción. Si no se configuró SECRET_KEY, se usa una aleatoria por arranque:
+    # es segura, pero las sesiones se cierran en cada reinicio. Defínela en Render > Environment para fijarla.
+    import secrets
+    config.SECRET_KEY = secrets.token_urlsafe(48)
+    logging.getLogger("consultorio").warning(
+        "SECRET_KEY no está definida: se generó una clave temporal. Agrégala en Render > Environment "
+        "para que las sesiones no se cierren en cada reinicio.")
 
 # Producción: sin documentación pública de la API (expone todas las rutas del expediente)
 app = FastAPI(title=config.APP_NAME, version="1.0.0-demo", redoc_url=None,
