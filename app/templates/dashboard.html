@@ -102,6 +102,31 @@
     {% endif %}
   </section>
 
+  {# ---------- resumen: periodo + una gráfica + 4 cifras (lo necesario; el detalle vive en Finanzas) ---------- #}
+  {% set r = resumen %}
+  <section class="card resumen b-full" id="resumen" aria-labelledby="resumen-title" data-rv="drop">
+    <div class="card-head">
+      <h2 id="resumen-title">Resumen</h2>
+      <nav class="periods" aria-label="Periodo">
+        {% for m, l in [(3, '3 meses'), (6, '6 meses'), (12, '1 año')] %}
+        <a href="/?periodo={{ m }}#resumen" class="{{ 'on' if r.months == m }}" {% if r.months == m %}aria-current="true"{% endif %}>{{ l }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    <div class="resumen-body">
+      <div class="resumen-chart">
+        <div class="rc-legend"><span><i style="background:var(--data)"></i>Ingresos</span><span><i style="background:var(--negative)"></i>Egresos</span></div>
+        <div style="height:230px"><canvas id="chartResumen" aria-label="Ingresos y egresos por mes"></canvas></div>
+      </div>
+      <ul class="rs-tiles">
+        <li class="rs rs-in"><span class="rs-ic">{{ icon('trend') }}</span><b class="tnum">{{ r.ingresos|money0 }}</b><small>Ingresos</small></li>
+        <li class="rs rs-out"><span class="rs-ic">{{ icon('receipt') }}</span><b class="tnum">{{ r.egresos|money0 }}</b><small>Egresos</small></li>
+        <li class="rs rs-ok"><span class="rs-ic">{{ icon('check') }}</span><b class="tnum">{{ r.citas }}</b><small>Citas atendidas</small></li>
+        <li class="rs rs-new"><span class="rs-ic">{{ icon('users') }}</span><b class="tnum">{{ r.nuevos }}</b><small>Pacientes nuevos</small></li>
+      </ul>
+    </div>
+  </section>
+
   {# ---------- accesos rápidos (en el celular, "Nueva cita" ya es el botón + de la barra) ---------- #}
   <nav class="quick b-full" aria-label="Accesos rápidos" data-rv="rise">
     <a class="qa qa-green qa-desk" href="/citas/nueva" style="--i:0"><span class="qa-art">{{ icon('calendar') }}</span><b>Nueva cita</b><small>Agenda y avisa por WhatsApp</small></a>
@@ -170,4 +195,40 @@
   if (sc && now && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth * 0.6); })();
 </script>
 <script type="module">window.jmAfterEnter(() => import("/static/js/hero3d.js?v=7"));</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+  const money = v => (v < 0 ? "-$" : "$") + Math.abs(Number(v)).toLocaleString("es-MX", {maximumFractionDigits: 0});
+  const s = {{ resumen.series|tojson }}, c = themeColor;
+  Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+  Chart.defaults.font.size = 12;
+  window.jmAfterEnter(() => {
+    const ds = (label, data, col) => ({ label, data, borderColor: c(col), backgroundColor: c(col), tension: .4, borderWidth: 2.5,
+      pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 2, pointHoverBackgroundColor: c("--sheet") });
+    const chart = new Chart(document.getElementById("chartResumen"), {
+      type: "line",
+      data: { labels: s.labels, datasets: [ds("Ingresos", s.ingresos, "--data"), ds("Egresos", s.egresos, "--negative")] },
+      options: {
+        maintainAspectRatio: false,
+        animation: { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 600, easing: "easeOutQuart" },
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false },
+          tooltip: { padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true, callbacks: { label: x => ` ${x.dataset.label}: ${money(x.raw)}` } } },
+        scales: { y: { ticks: { callback: money, maxTicksLimit: 4 }, border: { display: false } }, x: { grid: { display: false } } }
+      }
+    });
+    const paint = () => {
+      const [a, b] = chart.data.datasets;
+      a.borderColor = a.backgroundColor = c("--data"); b.borderColor = b.backgroundColor = c("--negative");
+      a.pointHoverBackgroundColor = b.pointHoverBackgroundColor = c("--sheet");
+      chart.options.scales.y.ticks.color = chart.options.scales.x.ticks.color = c("--muted");
+      chart.options.scales.y.grid.color = c("--rule"); chart.options.scales.x.border.color = c("--border");
+      Object.assign(chart.options.plugins.tooltip, { backgroundColor: c("--toast"), titleColor: c("--toast-ink"), bodyColor: c("--toast-ink") });
+      chart.update("none");
+    };
+    paint();
+    window.addEventListener("themechange", paint);
+  });
+})();
+</script>
 {% endblock %}

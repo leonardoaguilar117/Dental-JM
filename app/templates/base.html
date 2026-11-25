@@ -9,7 +9,7 @@
   <title>{% block title %}Inicio{% endblock %} · Consultorio Dental JM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/app.css?v=21">
+  <link rel="stylesheet" href="/static/css/app.css?v=23">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -14 120 124'><rect x='-10' y='-14' width='120' height='124' rx='30' fill='%23012880'/><path fill='%23c0cde6' d='M38 19C26 16 10 18 5 28C0 46 12 66 34 96C32 70 33 40 38 19Z'/><path fill='none' stroke='%23c0cde6' stroke-width='4' stroke-linecap='round' d='M39 21C52 5 74-2 91 12'/><path fill='none' stroke='%2385b559' stroke-width='7' stroke-linecap='round' d='M2 21C20 2 48 6 57 40C63 60 65 80 62 97'/><path fill='%2385b559' d='M63 15C85 14 100 30 96 50C92 70 76 85 62 97C72 80 83 62 85 46C87 30 78 19 63 15Z'/></svg>">
   <script type="importmap">
   { "imports": {
@@ -97,8 +97,9 @@
       {% set _ = extra.append(('/logout', 'logout', 'Salir', None, False)) %}
       {% set items = sections[4:] + extra %}
       <div class="more-grid">
+        <a class="more-item more-me {{ 'active' if path.startswith('/configuracion') }}" href="/configuracion#perfil" style="--ri:0"><span class="tile">{{ avatar(user.initials, user.color, '', user.avatar_src) }}</span><span class="more-label">Mi perfil</span></a>
         {% for href, ic, label, count, on in items %}
-        <a class="more-item {{ 'active' if on }}" href="{{ href }}" style="--ri:{{ loop.index0 }}"><span class="tile">{{ icon(ic) }}{% if count %}<span class="bubble {{ 'hot' if ic == 'bell' or (ic == 'box' and nav.inventario_urgente) }}">{{ count }}</span>{% endif %}</span><span class="more-label">{{ label }}</span></a>
+        <a class="more-item {{ 'active' if on }}" href="{{ href }}" style="--ri:{{ loop.index }}"><span class="tile">{{ icon(ic) }}{% if count %}<span class="bubble {{ 'hot' if ic == 'bell' or (ic == 'box' and nav.inventario_urgente) }}">{{ count }}</span>{% endif %}</span><span class="more-label">{{ label }}</span></a>
         {% endfor %}
       </div>
     </div>
