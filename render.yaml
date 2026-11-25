@@ -1,17 +1,22 @@
-# Blueprint de Render: servicio web (Docker) con la base SQLite dentro del contenedor, en un disco persistente.
+# Blueprint de Render: servicio web (Docker) con la base SQLite dentro del contenedor, en DATA_DIR (/var/data).
 # Render > New > Blueprint > selecciona el repositorio.
+#
+# Por ahora, plan gratuito SIN disco: la base se borra en cada despliegue y cada vez que el servicio se duerme.
+# Para conservar los datos, cambia a un plan de pago y monta un disco en /var/data: descomenta el bloque "disk"
+# y cambia "plan: free" por "plan: starter" (o agrégalo en el panel: Disks > Add Disk, Mount Path /var/data).
+# La app no necesita ningún otro cambio: sigue usando /var/data.
 services:
   - type: web
     name: consultorio-dental-jm
     runtime: docker
-    plan: starter          # los discos persistentes requieren plan de pago
+    plan: free
     region: oregon
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
-    disk:                  # aquí vive la base (crm_dental.db): sobrevive despliegues y reinicios
-      name: datos
-      mountPath: /var/data
-      sizeGB: 1
+    # disk:                # aquí vivirá la base (crm_dental.db): sobrevive despliegues y reinicios
+    #   name: datos
+    #   mountPath: /var/data
+    #   sizeGB: 1
     branch: main
     autoDeploy: true
     envVars:

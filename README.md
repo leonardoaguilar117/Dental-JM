@@ -45,7 +45,10 @@ docker run -p 8000:8000 -e SECRET_KEY=algo-secreto consultorio-jm
 
 ## Render
 
-La base de datos (SQLite) vive dentro del contenedor, en un **disco persistente** de Render montado en `/var/data`: así sobrevive despliegues y reinicios. Los discos persistentes requieren un plan de pago (Starter o superior).
+La base de datos (SQLite) vive dentro del contenedor, en `DATA_DIR=/var/data`.
+
+- **Ahora (plan gratuito, sin disco):** la app funciona, pero la base se borra en cada despliegue y cada vez que el servicio se duerme. Úsalo solo para probar.
+- **Para conservar los datos:** cambia a un plan de pago (Starter o superior) y agrega un **disco persistente** con *Mount Path* `/var/data` (en el panel: **Disks → Add Disk**, o descomentando el bloque `disk` de `render.yaml`). No hay que cambiar código ni variables.
 
 **Opción A, servicio nuevo con Blueprint:** **New → Blueprint**, elige el repositorio. `render.yaml` crea el servicio Docker (plan Starter, rama `main`, despliegue automático), el disco `datos` en `/var/data` y una `SECRET_KEY` aleatoria. Solo pedirá `DEMO_PASSWORD`.
 
