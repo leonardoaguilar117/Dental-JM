@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon, theme_picker %}
+{% from "_icons.html" import icon, theme_picker, logo %}
 {% block title %}Iniciar sesión{% endblock %}
 {% block flashes %}{% endblock %}{# en el login el aviso va dentro del formulario #}
 {% block public %}
@@ -7,7 +7,7 @@
   <section class="login-main">
     <header class="login-top">
       <a class="login-brand" href="/login">
-        <span class="dock-mark">{{ icon('tooth') }}</span>
+        <span class="dock-mark">{{ logo() }}</span>
         <span><b>Consultorio Dental JM</b><small>Ortodoncia · Estética dental</small></span>
       </a>
       {{ theme_picker(theme|default('lavanda')) }}

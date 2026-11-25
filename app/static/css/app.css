@@ -24,6 +24,7 @@
   --info-bg: #e6ebf8; --info-ink: #012880; --neutral-pill: #ebe7f3; --neutral-pill-ink: #4b3f66;
   --toast: #012880; --toast-ink: #ffffff;
   --hover-row: #f8f9fc; --today-bg: #f1f5ec;
+  --logo-a: #c0cde6; --logo-b: #85b559;
 }
 
 /* ---------- TEMA · Lavanda noche (oscuro: los mismos #012880 #A393BE #C0CDE6 #85B559, llevados a poca luz) ---------- */
@@ -44,6 +45,7 @@
   --info-bg: #262f50; --info-ink: #bfcbf3; --neutral-pill: #2c2847; --neutral-pill-ink: #d2c9e8;
   --toast: #c0cde6; --toast-ink: #0d1838;
   --hover-row: #222844; --today-bg: #233026;
+  --logo-a: #012880; --logo-b: #6e9c45;
 }
 
 :root {
@@ -149,7 +151,13 @@ small, .muted { color: var(--muted); }
   background: var(--frame-ink); color: var(--frame); display: grid; place-items: center;
   transition: transform 200ms var(--ease-out);
 }
-.dock-mark svg { width: 24px; height: 24px; }
+.dock-mark svg { width: 30px; height: 30px; }
+/* logo de Dental JM: lóbulo y arco claro = --logo-a; trazos del diente = --logo-b */
+.logo .logo-a { fill: var(--logo-a); }
+.logo .logo-b { fill: var(--logo-b); }
+.logo .logo-a-line, .logo .logo-b-line { fill: none; stroke-linecap: round; }
+.logo .logo-a-line { stroke: var(--logo-a); stroke-width: 4; }
+.logo .logo-b-line { stroke: var(--logo-b); stroke-width: 6.5; }
 .dock-mark:hover { transform: rotate(-8deg); color: var(--frame); }
 .dock-item {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -620,7 +628,7 @@ a.alert-box:active { transform: scale(0.99); }
 .login-alert { display: flex; gap: 8px; align-items: flex-start; margin: -12px 0 20px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 18px; background: var(--info-bg); color: var(--info-ink); }
 .login-alert.is-error { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
 .login-alert svg { width: 16px; height: 16px; margin-top: 1px; }
-.login-brand .dock-mark svg { width: 20px; height: 20px; }
+.login-brand .dock-mark svg { width: 26px; height: 26px; }
 .login-brand b { display: block; font-weight: 600; font-size: 14px; line-height: 18px; }
 .login-brand small { display: block; font-size: 12.5px; line-height: 16px; color: var(--muted); }
 .login .theme-toggle { background: var(--raised); border-color: var(--border); color: var(--text); }

@@ -67,3 +67,13 @@
   <span class="moon">{{ icon('moon') }}</span><span class="sun">{{ icon('sun') }}</span>
 </button>
 {%- endmacro %}
+
+{# marca de Dental JM (logo del consultorio) recoloreada con la paleta; colores en --logo-a / --logo-b #}
+{% macro logo() -%}
+<svg class="logo" viewBox="0 -4 100 104" aria-hidden="true">
+<path class="logo-a" d="M38 19C26 16 10 18 5 28C0 46 12 66 34 96C32 70 33 40 38 19Z"/>
+<path class="logo-a-line" d="M39 21C52 5 74-2 91 12"/>
+<path class="logo-b-line" d="M2 21C20 2 48 6 57 40C63 60 65 80 62 97"/>
+<path class="logo-b" d="M63 15C85 14 100 30 96 50C92 70 76 85 62 97C72 80 83 62 85 46C87 30 78 19 63 15Z"/>
+</svg>
+{%- endmacro %}
