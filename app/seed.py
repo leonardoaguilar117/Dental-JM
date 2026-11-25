@@ -1,10 +1,9 @@
-"""Datos ficticios para la demo. Se cargan solo si la base está vacía (SEED_DEMO=true)."""
+"""Datos iniciales (config.SEED): "demo" carga la demostración completa; "inicial", los doctores y 4 pacientes."""
 from __future__ import annotations
 
 import json
 import logging
 import random
-import secrets
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -39,14 +38,21 @@ UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28]
 LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
 
 
-def seed_if_empty(db: Session) -> None:
-    if db.scalar(select(User.id).limit(1)):
+# modo "inicial": dos pacientes por doctor (una mujer y un hombre cada uno)
+INITIAL_PATIENTS = (0, 1, 5, 6)  # Valeria, Diego (Dra. Jimena) · Andrés, Mariana (Dr. Juan Carlos)
+
+
+def seed_if_empty(db: Session, mode: str | None = None) -> None:
+    mode = mode or config.SEED
+    if mode == "ninguno" or db.scalar(select(User.id).limit(1)):
         return
-    # Nunca una contraseña pública en producción: DEMO_PASSWORD, o una aleatoria que se muestra una sola vez en el log
-    pwd = config.DEMO_PASSWORD or ("demo123" if not config.IS_PRODUCTION else secrets.token_urlsafe(12))
     if config.IS_PRODUCTION and not config.DEMO_PASSWORD:
-        logging.getLogger("seed").warning("Usuarios iniciales jimena y carlos creados. Contraseña temporal: %s "
-                                          "(cámbiala en Configuración)", pwd)
+        raise RuntimeError("Falta configurar en Render > Environment:\n  - DEMO_PASSWORD: la contraseña inicial de "
+                           "jimena y carlos (se usa solo al crear las cuentas; luego cada uno la cambia en Configuración)")
+    if config.IS_PRODUCTION and len(config.DEMO_PASSWORD) < 10:
+        raise RuntimeError("DEMO_PASSWORD debe tener al menos 10 caracteres.")
+    pwd = config.DEMO_PASSWORD or "demo123"  # demo123 solo en local
+    logging.getLogger("seed").info("Base vacía: creando datos iniciales (modo %s).", mode)
     rnd = random.Random(42)
     today = today_local()
     now = now_local()
@@ -64,6 +70,8 @@ def seed_if_empty(db: Session) -> None:
     # ---------- Pacientes + historia clínica ----------
     patients = []
     for i, (fn, ln, sex, age, d, occ) in enumerate(PATIENTS):
+        if mode != "demo" and i not in INITIAL_PATIENTS:
+            continue
         bd = today.replace(year=today.year - age) - timedelta(days=rnd.randint(10, 300))
         p = Patient(first_name=fn, last_name=ln, sex=sex, birth_date=bd,
                     phone=f"55{rnd.randint(10000000, 99999999)}",
@@ -113,6 +121,10 @@ def seed_if_empty(db: Session) -> None:
             aviso_privacidad=True, updated_by_id=docs[d].id, updated_at=p.created_at,
         ))
         patients.append((p, d))
+
+    if mode != "demo":   # inicial: solo doctores y pacientes con su expediente
+        db.commit()
+        return
 
     # ---------- Tratamientos + pagos ----------
     catalog_j = [("Ortodoncia fija brackets metálicos", 28000, 24), ("Ortodoncia con alineadores", 42000, 18),

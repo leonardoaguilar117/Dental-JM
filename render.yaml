@@ -8,16 +8,19 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
+    branch: main
+    autoDeploy: true
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: ENVIRONMENT
         value: production
-      # Contraseña inicial de jimena y carlos (si no se define, se genera una y se imprime en el log del primer arranque)
+      # Contraseña inicial de jimena y carlos (obligatoria la primera vez; mínimo 10 caracteres)
       - key: DEMO_PASSWORD
         sync: false
-      - key: SEED_DEMO
-        value: "true"
+      # Base vacía → cuentas de los doctores y 4 pacientes de ejemplo ("demo" carga la demostración completa)
+      - key: SEED
+        value: inicial
       - key: TZ_CONSULTORIO
         value: America/Mexico_City
       - key: WHATSAPP_COUNTRY_CODE

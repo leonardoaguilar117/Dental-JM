@@ -21,7 +21,16 @@ CLINIC_RESPONSABLE = os.getenv("CLINIC_RESPONSABLE", "")  # responsable sanitari
 CLINIC_RESPONSABLE_CEDULA = os.getenv("CLINIC_RESPONSABLE_CEDULA", "")
 RETENTION_YEARS = 5  # NOM-004-SSA3-2012, 5.4: conservación mínima del expediente
 TIMEZONE = ZoneInfo(os.getenv("TZ_CONSULTORIO", "America/Mexico_City"))
-SEED_DEMO = os.getenv("SEED_DEMO", "true").lower() in ("1", "true", "yes", "si")
+# Datos iniciales cuando la base está vacía:
+#   "demo"    → demostración completa (pacientes, citas, tratamientos, finanzas e inventario ficticios)
+#   "inicial" → solo las cuentas de los doctores y 4 pacientes de ejemplo (para empezar en producción)
+#   "ninguno" → no crea nada
+# SEED_DEMO=true/false se respeta por compatibilidad: true → "demo", false → "inicial".
+_seed_legacy = os.getenv("SEED_DEMO", "").lower()
+SEED = os.getenv("SEED", "").lower() or (
+    "demo" if _seed_legacy in ("1", "true", "yes", "si") else "inicial" if _seed_legacy else
+    ("inicial" if IS_PRODUCTION else "demo"))
+SEED_DEMO = SEED != "ninguno"  # alias antiguo
 COUNTRY_CODE = os.getenv("WHATSAPP_COUNTRY_CODE", "52")
 
 # Google Calendar (opcional). Si no se configuran, la app usa el feed iCal + enlaces "Añadir a Google".
