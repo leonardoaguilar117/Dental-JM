@@ -17,13 +17,16 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY app ./app
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-RUN useradd --create-home appuser && mkdir -p /app/data && chown -R appuser:appuser /app
-USER appuser
+# la app corre como appuser; el entrypoint arranca como root solo para darle el disco persistente (DATA_DIR)
+RUN useradd --create-home appuser && mkdir -p /app/data && chown -R appuser:appuser /app \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD python -c "import urllib.request,os;urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\",\"8000\")}/healthz')" || exit 1
 
 # Render inyecta $PORT; --proxy-headers para que las URLs generadas usen https
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
