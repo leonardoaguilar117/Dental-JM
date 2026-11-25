@@ -1,20 +1,20 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Appointment, User
+from ..models import Appointment, Patient, User
 from ..services import finance, inventory, notifications
-from ..utils import DIAS, MESES, fecha, today_local
+from ..utils import DIAS, MESES, add_months, fecha, month_bounds, today_local
 from ..web import current_user, render
 
 router = APIRouter()
 
 
 @router.get("/")
-def dashboard(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def dashboard(request: Request, periodo: str = "6", db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Inicio: el día del consultorio. Las finanzas viven en /finanzas."""
     from ..utils import now_local, whatsapp_link
     today = today_local()
@@ -63,6 +63,18 @@ def dashboard(request: Request, db: Session = Depends(get_db), user: User = Depe
     feed += [{"kind": "rem", "id": x["r"].id, "p": x["r"].patient, "what": x["r"].kind, "late": False,
               "when": x["r"].due_date, "wa": x["wa"] if x["r"].patient.phone else None} for x in reminders if not x["overdue"]]
 
+    # resumen del periodo (3, 6 o 12 meses): solo lo necesario para ver cómo va el consultorio
+    months = {"3": 3, "6": 6, "12": 12}.get(periodo, 6)
+    series = finance.series(db, user, today.year, today.month, months)
+    py, pm = add_months(today.year, today.month, -(months - 1))
+    p_start = datetime.combine(month_bounds(py, pm)[0], datetime.min.time())
+    attended = db.scalar(select(func.count(Appointment.id)).where(
+        Appointment.doctor_id == user.id, Appointment.status == "atendida", Appointment.start >= p_start)) or 0
+    new_patients = db.scalar(select(func.count(Patient.id)).where(
+        Patient.primary_doctor_id == user.id, Patient.created_at >= p_start)) or 0
+    resumen = {"months": months, "series": series, "ingresos": sum(series["ingresos"]),
+               "egresos": sum(series["egresos"]), "citas": attended, "nuevos": new_patients}
+
     receivable_total, _ = finance.receivables(db, user)
     summary = finance.month_summary(db, user, today.year, today.month)
     inv = inventory.alerts(db, user.id) if user.can_inventory else None
@@ -70,7 +82,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), user: User = Depe
         request, "dashboard.html", db, user,
         today_appts=today_appts, to_attend=to_attend, unmarked=unmarked,
         upcoming_count=len(to_attend) + len(week_appts), next_appt=next_appt, next_wa=next_wa, week=week,
-        feed=feed, notif=notif, inv=inv, receivable_total=receivable_total, summary=summary,
+        feed=feed, notif=notif, resumen=resumen, inv=inv, receivable_total=receivable_total, summary=summary,
         month_name=MESES[today.month - 1], day=_day_strip(db, user, t0),
         finding=_finding(notif, to_attend, unmarked, user),
     )
