@@ -11,13 +11,61 @@
   </div>
 </div>
 
+{% set ctx = ('Mes en curso · día ' ~ today_day ~ ' de ' ~ month_days) if in_progress else 'Mes cerrado' %}
+{% macro delta(v, invert=False) -%}
+  {%- if v is not none -%}
+    {%- set good = (v >= 0) != invert -%}
+    · <span class="{{ 'delta-up' if good else 'delta-down' }}">{{ '+' if v >= 0 }}{{ v }}%</span> vs. {{ 'el mes anterior completo' if in_progress else 'el mes anterior' }}
+  {%- endif -%}
+{%- endmacro %}
+<p class="fin-context">{{ ctx }}{% if in_progress %}: las comparaciones contra el mes anterior completo se emparejan conforme avanza el mes.{% endif %}</p>
 <div class="grid g-4 mb">
-  <div class="card kpi"><div class="label">Ingresos</div><div class="value">{{ summary.ingresos.total|money0 }}</div><div class="sub">Tratamientos {{ summary.ingresos.tratamientos|money0 }}{% if summary.ingresos.ventas %} · Depósito {{ summary.ingresos.ventas|money0 }}{% endif %}</div></div>
-  <div class="card kpi"><div class="label">Egresos</div><div class="value">{{ summary.egresos.total|money0 }}</div><div class="sub">Propios {{ summary.egresos.personal|money0 }} · Compartidos {{ summary.egresos.compartido|money0 }}</div></div>
-  <div class="card kpi"><div class="label">Utilidad</div><div class="value" style="color:{{ 'var(--ok)' if summary.utilidad >= 0 else 'var(--bad)' }}">{{ summary.utilidad|money0 }}</div><div class="sub">Del mes seleccionado</div></div>
+  <div class="card kpi"><div class="label"><span class="dot" style="background:var(--data)"></span>Ingresos</div><div class="value" data-count="{{ summary.ingresos.total }}" data-money>{{ summary.ingresos.total|money0 }}</div><div class="sub">Tratamientos {{ summary.ingresos.tratamientos|money0 }}{% if summary.ingresos.ventas %} · Depósito {{ summary.ingresos.ventas|money0 }}{% endif %} {{ delta(summary.var_ingresos) }}</div></div>
+  <div class="card kpi"><div class="label"><span class="dot" style="background:var(--data-2)"></span>Egresos</div><div class="value" data-count="{{ summary.egresos.total }}" data-money>{{ summary.egresos.total|money0 }}</div><div class="sub">Propios {{ summary.egresos.personal|money0 }} · Compartidos {{ summary.egresos.compartido|money0 }} {{ delta(summary.var_egresos, True) }}</div></div>
+  <div class="card kpi"><div class="label">Utilidad</div><div class="value" style="color:{{ 'var(--ok)' if summary.utilidad >= 0 else 'var(--bad)' }}">{{ summary.utilidad|money0 }}</div><div class="sub">Ingresos menos egresos</div></div>
   <div class="card kpi"><div class="label">Por cobrar</div><div class="value">{{ rec_total|money0 }}</div><div class="sub">{{ rec_items|length }} tratamiento(s) con saldo</div></div>
 </div>
 
+<div class="grid fin-summary mb">
+  <section class="card">
+    <div class="card-head">
+      <h2>Ingresos y egresos · 6 meses</h2>
+      <div class="day-legend"><span><span class="swatch" style="background:var(--data)"></span>Ingresos</span><span><span class="swatch" style="background:var(--data-2)"></span>Egresos</span></div>
+    </div>
+    <div class="card-body"><div style="height:240px"><canvas id="chartSeries" aria-label="Gráfica de ingresos y egresos de los últimos 6 meses"></canvas></div></div>
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>Gastos por categoría</h2><span class="muted tnum">{{ summary.egresos.total|money0 }}</span></div>
+    {% if summary.egresos.por_categoria %}
+    <ul class="barlist card-body">
+      {% for cat, val in summary.egresos.por_categoria.items() %}{% if loop.index <= 6 %}
+      <li><span class="bl-name">{{ cat }}</span><span class="bl-val">{{ val|money0 }}</span>
+        <span class="bl-bar"><span style="width:{{ (100 * val / max_cat)|round(1) if max_cat else 0 }}%;animation-delay:{{ loop.index0 * 50 }}ms"></span></span></li>
+      {% endif %}{% endfor %}
+    </ul>
+    {% else %}<div class="empty">Sin gastos registrados este mes.</div>{% endif %}
+  </section>
+</div>
+
+<section class="card mb">
+  <div class="card-head"><h2>Tratamientos en proceso</h2><span class="muted">{{ active_treatments|length }} activos</span></div>
+  {% if active_treatments %}
+  <div class="table-wrap stack-sm"><table class="table">
+    <thead><tr><th>Paciente</th><th>Tratamiento</th><th class="num">Avance clínico</th><th class="num">Pagado</th><th class="num">Saldo</th></tr></thead>
+    <tbody>
+    {% for t in active_treatments %}
+      <tr>
+        <td><a class="rowlink" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a></td>
+        <td>{{ t.name }}</td>
+        <td class="num" data-l="Avance" style="min-width:140px"><div class="row"><div class="progress" style="flex:1"><span style="width:{{ t.progress_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.sessions_done }}/{{ t.sessions_planned }}</small></div></td>
+        <td class="num" data-l="Pagado" style="min-width:120px"><div class="row"><div class="progress blue" style="flex:1"><span style="width:{{ t.paid_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.paid_pct }}%</small></div></td>
+        <td class="num" data-l="Saldo">{{ t.balance|money0 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<div class="empty">No hay tratamientos en proceso.</div>{% endif %}
+</section>
 
 <div class="tabs">
   <a href="#cobros" data-tab="cobros">Cobros del mes ({{ payments|length }})</a>
@@ -135,6 +183,45 @@
 </section>
 {% endblock %}
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+const money = v => (v < 0 ? "-$" : "$") + Math.abs(Number(v)).toLocaleString("es-MX", {maximumFractionDigits: 0});
+Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+const series = {{ chart|tojson }};
+const c = themeColor;
+window.jmAfterEnter(() => {
+const chart = new Chart(document.getElementById("chartSeries"), {
+  type: "bar",
+  data: { labels: series.labels, datasets: [
+    { label: "Ingresos", data: series.ingresos, backgroundColor: c("--data"), borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
+    { label: "Egresos", data: series.egresos, backgroundColor: c("--data-2"), borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
+  ]},
+  options: {
+    maintainAspectRatio: false,
+    animation: { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 500, easing: "easeOutQuart" },
+    interaction: { mode: "index", intersect: false },
+    plugins: { legend: { display: false },
+      tooltip: { padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true, callbacks: { label: x => ` ${x.dataset.label}: ${money(x.raw)}` } } },
+    scales: { y: { ticks: { callback: money, maxTicksLimit: 5 }, border: { display: false } }, x: { grid: { display: false } } }
+  }
+});
+function paintChart() {
+  const [a, b] = chart.data.datasets;
+  a.backgroundColor = c("--data"); a.hoverBackgroundColor = c("--data-ink");
+  b.backgroundColor = c("--data-2"); b.hoverBackgroundColor = c("--data-2-hover");
+  chart.options.color = c("--muted");
+  chart.options.scales.y.ticks.color = c("--muted"); chart.options.scales.x.ticks.color = c("--muted");
+  chart.options.scales.y.grid.color = c("--rule"); chart.options.scales.x.border.color = c("--border");
+  chart.options.plugins.tooltip.backgroundColor = c("--toast"); chart.options.plugins.tooltip.titleColor = c("--toast-ink"); chart.options.plugins.tooltip.bodyColor = c("--toast-ink");
+  chart.update("none");
+}
+paintChart();
+window.addEventListener("themechange", paintChart);
+});
+})();
+</script>
 <script>
 // "Pagado por" solo aplica a gastos compartidos; uno propio siempre es de quien lo registra
 document.querySelectorAll('input[name="scope"]').forEach(r => r.addEventListener("change", () => {

@@ -13,7 +13,7 @@ from . import config
 from .database import get_db
 from .models import User
 from .services import notifications
-from .utils import fecha, money, money0, relative_days, today_local, whatsapp_link
+from .utils import fecha, money, money0, now_local, relative_days, today_local, whatsapp_link
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -25,6 +25,7 @@ templates.env.filters["qty"] = lambda v: f"{float(v or 0):,.2f}".rstrip("0").rst
 templates.env.globals["wa"] = whatsapp_link
 templates.env.globals["cfg"] = config
 templates.env.globals["today"] = today_local
+templates.env.globals["now_hour"] = lambda: now_local().hour
 
 
 class NotAuthenticated(Exception):
@@ -58,10 +59,11 @@ def pop_flash(request: Request) -> list[dict]:
 
 
 THEMES = {
-    "arrecife": {"name": "Arrecife", "swatches": ["#1c4a6d", "#07a2c8", "#6cf7a0", "#a95482"]},
-    "lavanda": {"name": "Lavanda", "swatches": ["#c0cde6", "#012880", "#85b559", "#a393be"]},
-    "grafito": {"name": "Grafito", "swatches": ["#e4e6ea", "#2b2e35", "#a393be", "#85b559"]},
+    "lavanda": {"name": "Lavanda", "swatches": ["#c0cde6", "#012880", "#a393be"], "desc": "Claro · azul marino y lavanda"},
+    "noche": {"name": "Lavanda noche", "swatches": ["#161a2e", "#b8b0dc", "#c0cde6"], "desc": "Oscuro · la misma paleta, para poca luz"},
 }
+# temas retirados: quien los tenía guardados cae al equivalente claro u oscuro
+LEGACY_THEMES = {"arrecife": "noche", "grafito": "lavanda"}
 DEFAULT_THEME = "lavanda"
 templates.env.globals["THEMES"] = THEMES
 
@@ -99,7 +101,7 @@ def render(request: Request, template: str, db: Session, user: User | None, **ct
         flashes=pop_flash(request),
         notif_count=notifications.count_only(db, user) if user else 0,
         nav=_nav_counts(db, user) if user else {},
-        theme=theme if theme in THEMES else DEFAULT_THEME,  # p.ej. quien tenía el tema Lima
+        theme=theme if theme in THEMES else LEGACY_THEMES.get(theme, DEFAULT_THEME),
         path=request.url.path,
     )
     return templates.TemplateResponse(request, template, ctx)

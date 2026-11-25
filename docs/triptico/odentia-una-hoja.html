@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Odentia · Hoja informativa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --frame:#c0cde6; --navy:#012880; --frame-muted:#3c4a72; --ink:#0d1838; --muted:#4d5876;
+  --border:#e1e5ef; --hero:#eef1f9; --accent:#85b559; --accent-ink:#15270a; --accent-tint:#eef6e6; --teal:#2f6c74;
+  --font:"IBM Plex Sans",system-ui,"Segoe UI",sans-serif;
+}
+@page{size:8.5in 11in;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#8f9bb8}
+body{font-family:var(--font);color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact;line-height:1.4}
+.page > *{flex:none}
+.page{width:8.5in;height:11in;margin:.35in auto;background:#fff;padding:.38in;display:flex;flex-direction:column;gap:.15in;overflow:hidden;box-shadow:0 20px 50px -20px rgba(1,40,128,.45)}
+@media print{html,body{background:none}.page{margin:0;box-shadow:none}}
+
+/* Encabezado */
+.hero{background:var(--navy);color:#fff;border-radius:18px;padding:.26in .32in;display:grid;grid-template-columns:1fr 2.65in;gap:.25in;align-items:center;overflow:hidden}
+.brand{display:flex;align-items:center;gap:.1in;margin-bottom:.14in}
+.mark{width:.44in;height:.44in;border-radius:.13in;background:var(--frame);color:var(--navy);display:grid;place-items:center}
+.mark svg{width:.26in;height:.26in}
+.brand b{font-size:17pt;font-weight:600;letter-spacing:-.02em;display:block;line-height:1}
+.brand small{font-size:8pt;color:var(--frame)}
+h1{font-size:28pt;line-height:1.02;letter-spacing:-.04em;font-weight:600;margin-bottom:.12in}
+h1 em{font-style:normal;color:var(--accent);white-space:nowrap}
+.hero p{font-size:11pt;color:#d6def0}
+.hero .shot{height:1.75in;border-radius:12px;overflow:hidden;background:#e3e9f5}
+.hero .shot img{width:100%;height:100%;object-fit:cover;display:block;object-view-box:inset(930px 690px 370px 250px)}
+
+/* Funciones */
+h2{font-size:14pt;color:var(--navy);letter-spacing:-.02em;font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:.14in}
+.tile{border:1px solid var(--border);border-radius:12px;padding:.13in .17in;background:#fff}
+.tile h3{display:flex;align-items:center;gap:.09in;font-size:11.5pt;color:var(--navy);margin-bottom:.07in}
+.tile h3 i{width:.3in;height:.3in;border-radius:8px;background:var(--hero);display:grid;place-items:center;color:var(--navy)}
+.tile h3 i svg{width:.17in;height:.17in}
+.tile ul{list-style:none;display:grid;gap:.04in}
+.tile li{font-size:10pt;padding-left:.18in;position:relative}
+.tile li::before{content:"";position:absolute;left:0;top:.06in;width:.1in;height:.1in;border-radius:3px;background:var(--accent)}
+
+/* Forma de pago */
+.pay{display:grid;grid-template-columns:auto 1fr;gap:.25in;align-items:center;background:var(--accent-tint);border:1.5px solid var(--accent);border-radius:14px;padding:.16in .22in}
+.pay .tag{background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:.14in .2in;text-align:center}
+.pay .tag b{display:block;font-size:19pt;letter-spacing:-.02em;line-height:1}
+.pay .tag span{font-size:8.5pt;font-weight:600}
+.pay h3{font-size:12.5pt;color:var(--accent-ink);margin-bottom:.05in}
+.pay p{font-size:10pt;color:#2c3d1c}
+
+/* Norma */
+.nom{display:flex;align-items:center;gap:.12in;background:var(--hero);border-radius:12px;padding:.13in .2in;font-size:9.6pt;color:var(--frame-muted)}
+.nom svg{width:.26in;height:.26in;color:var(--navy);flex:none}
+.nom b{color:var(--navy)}
+
+/* Contacto */
+.contact{margin-top:auto;display:grid;grid-template-columns:1fr auto;gap:.25in;align-items:center;background:var(--frame);border-radius:16px;padding:.18in .26in}
+.contact h2{font-size:16pt;margin-bottom:.04in}
+.contact .sub{font-size:9.8pt;color:var(--frame-muted);margin-bottom:.12in}
+.contact .name{font-weight:600;font-size:11.5pt;color:var(--navy)}
+.contact .phone{font-size:20pt;font-weight:700;color:var(--navy);letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.15}
+.contact .mail{font-size:10.5pt}
+.contact .web{font-size:10.5pt;margin-top:.04in}
+.contact .web a{color:var(--navy);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.qr{background:#fff;border-radius:12px;padding:.09in;text-align:center;width:1.3in}
+.qr img{width:100%;display:block}
+.qr span{display:block;font-size:8pt;color:var(--frame-muted);margin-top:.05in;font-weight:600}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <section class="hero">
+    <div>
+      <div class="brand">
+        <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4 8.6 3 6.8 3.4 4.2 4 3 6.6 3.6 9.6c.4 2 1.3 3.4 1.8 5.4.6 2.6.9 6 2.6 6 1.9 0 1.6-4.9 4-4.9s2.1 4.9 4 4.9c1.7 0 2-3.4 2.6-6 .5-2 1.4-3.4 1.8-5.4.6-3-.6-5.6-3.2-6.2C15.4 3 13.5 4 12 5.5z"/></svg></span>
+        <span><b>Odentia</b><small>Software para consultorios dentales</small></span>
+      </div>
+      <h1>Atienda pacientes, <em>no papeles.</em></h1>
+      <p>Agenda, expediente clínico y cobros en un solo lugar. Desde su computadora, tableta o celular.</p>
+    </div>
+    <div class="shot"><img src="img/paciente.png" alt="Tipodonto 3D del paciente en Odentia"></div>
+  </section>
+
+  <h2>Todo su consultorio, en orden</h2>
+  <div class="grid">
+    <div class="tile">
+      <h3><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i>Agenda</h3>
+      <ul>
+        <li>Un color por doctor y aviso de citas empalmadas.</li>
+        <li>Sincroniza con Google Calendar.</li>
+        <li>Confirmaciones y recordatorios por WhatsApp.</li>
+      </ul>
+    </div>
+    <div class="tile">
+      <h3><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h4"/></svg></i>Expediente clínico</h3>
+      <ul>
+        <li>Historia clínica completa y odontograma 3D.</li>
+        <li>Consentimiento firmado en pantalla.</li>
+        <li>Notas con su cédula profesional, listas para imprimir.</li>
+      </ul>
+    </div>
+    <div class="tile">
+      <h3><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg></i>Cobros</h3>
+      <ul>
+        <li>Presupuestos, abonos y recibos en segundos.</li>
+        <li>Sepa al momento quién le debe y cuánto.</li>
+        <li>Cada doctor ve solo sus ingresos.</li>
+      </ul>
+    </div>
+    <div class="tile">
+      <h3><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M8 15l4-4 3 3 5-6"/></svg></i>Finanzas</h3>
+      <ul>
+        <li>Ingresos, gastos y utilidad del mes.</li>
+        <li>Gastos compartidos repartidos por porcentaje.</li>
+        <li>Reportes exportables a Excel.</li>
+      </ul>
+    </div>
+  </div>
+
+  <section class="pay">
+    <div class="tag"><b>Pago único</b><span>por el software</span></div>
+    <div>
+      <h3>Sin mensualidades por el programa</h3>
+      <p>Usted paga el software una sola vez. Después, solo cubre la renta del hospedaje en la nube (Render) según el uso de su consultorio.</p>
+    </div>
+  </section>
+
+  <div class="nom">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z"/><path d="M8.8 12.2l2.3 2.3 4.2-4.6"/></svg>
+    <span>Diseñado conforme a la <b>NOM-004-SSA3-2012</b> y la <b>NOM-013-SSA2-2015</b>, con bitácora de accesos, aviso de privacidad y conexión cifrada.</span>
+  </div>
+
+  <section class="contact">
+    <div>
+      <h2>Pida su demostración gratuita</h2>
+      <p class="sub">Se lo dejamos listo y lo capacitamos a usted y a su equipo.</p>
+      <div class="name">Leonardo Aguilar Martínez</div>
+      <div class="phone">55 7196 2228</div>
+      <div class="mail">WhatsApp y llamadas · leonardogrl18@gmail.com</div>
+      <div class="web">Véalo en línea: <a href="https://dental-jm.onrender.com/">dental-jm.onrender.com</a></div>
+    </div>
+    <div class="qr"><img src="img/qr-whatsapp.svg" alt="Código QR para escribir por WhatsApp"><span>Escanee y escriba «DEMO»</span></div>
+  </section>
+
+</main>
+</body>
+</html>

@@ -11,7 +11,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { createStage, enamelMaterial, toothGeometry, toothKind, QUADRANT, css, reduceMotion, hasWebGL } from "./dental3d.js";
+import { createStage, enamelMaterial, toothGeometry, toothKind, QUADRANT, css, reduceMotion, hasWebGL } from "./dental3d.js?v=4";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 7, 8];
 const WIDTH = { 1: 0.86, 2: 0.74, 3: 0.8, 4: 0.76, 5: 0.76, 6: 1.08, 7: 1.02, 8: 0.96 };
@@ -48,7 +48,7 @@ function gumGeometry({ A, B }) {
   const OUT = 0.5, IN = 0.72, END = PHI0 + PHI_SPAN + 0.12;
   const pt = (phi, d) => new THREE.Vector2((A + d) * Math.sin(phi), -(B + d) * Math.cos(phi));
   const shape = new THREE.Shape();
-  const N = 64;
+  const N = 160;
   shape.moveTo(...pt(-END, OUT).toArray());
   for (let i = 1; i <= N; i++) shape.lineTo(...pt(-END + (2 * END * i) / N, OUT).toArray());
   // remate trasero redondeado (detrás de los terceros molares)
@@ -59,7 +59,7 @@ function gumGeometry({ A, B }) {
   shape.quadraticCurveTo(capL.x, capL.y, ...pt(-END, OUT).toArray());
 
   const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.14, bevelEnabled: true, bevelThickness: 0.26, bevelSize: 0.24, bevelSegments: 10, curveSegments: 24, steps: 1,
+    depth: 0.14, bevelEnabled: true, bevelThickness: 0.26, bevelSize: 0.24, bevelSegments: 16, curveSegments: 48, steps: 1,
   });
   geo.rotateX(-Math.PI / 2);          // forma en XZ, extrusión hacia +Y
   geo.translate(0, -(0.14 + 0.26), 0); // la cara superior (con bisel) queda en y = 0
@@ -75,7 +75,17 @@ export function mountTypodont(el) {
   const inflamed = encia.filter((x) => INFLAMED.includes(x));
   const stage = createStage(el, { fov: 30 });
   const { scene, camera, renderer } = stage;
-  scene.environmentIntensity = 0.42;
+  scene.environmentIntensity = 0.28;
+  // luz más direccional: el volumen de cada corona se lee por sombreado, no solo por silueta
+  stage.lights.hemi.intensity = 0.7;
+  stage.lights.key.intensity = 3.1;
+  stage.lights.key.position.set(2.5, 5, 7);
+  // luz de relleno desde abajo y suelo neutro: las vistas oclusales superiores no se tiñen del verde del tema
+  const neutralGround = () => stage.lights.hemi.groundColor.set("#d9d3c6");
+  neutralGround();
+  const fill = new THREE.DirectionalLight(0xffffff, 1.5);
+  fill.position.set(-1.5, -6, 4);
+  scene.add(fill);
 
   // etiquetas HTML (texto nítido a cualquier zoom, con los colores del tema)
   const labels = new CSS2DRenderer();
@@ -168,13 +178,15 @@ export function mountTypodont(el) {
           group.add(socket, rim);
         }
       } else {
-        const color = { corona: stateColor, extraer: "#e7d6d3" }[state] || "#f4f0e8";
-        const mat = enamelMaterial({ color, rim: rimColor, rimStrength: 0.06, clearcoat: 0.35,
+        const color = { corona: stateColor, extraer: "#e7d6d3" }[state] || "#ede3cf";
+        const mat = enamelMaterial({ color, rim: rimColor, rimStrength: 0.06, clearcoat: 0.45, edge: 0.42,
                                      transmission: state === "endodoncia" ? 0.4 : 0 });
         mat.roughness = 0.38;
         if (state === "corona") { mat.metalness = 0.15; mat.roughness = 0.24; }
         mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.scale.set(0.93, 1, 0.97);   // holgura interproximal: cada pieza se distingue de su vecina
       }
       group.add(mesh);
 
@@ -288,8 +300,9 @@ export function mountTypodont(el) {
   }
   let activePreset = null;
 
-  function goTo({ cam = null, target = null, open: o = open, only: k = null }) {
+  function goTo({ cam = null, target = null, open: o = open, only: k = null }, dur = 0.7) {
     isolate(k);
+    anim.dur = dur;
     anim.from = { cam: camera.position.toArray(), target: controls.target.toArray(), open };
     anim.to = { cam, target, open: o };
     anim.t = 0;
@@ -318,17 +331,17 @@ export function mountTypodont(el) {
     activePreset = name;
     goTo({ cam: p.cam, target: p.target, open: p.open ?? open, only: p.only });
   }
-  function zoom(factor) {
+  function zoom(factor, dur) {
     const off = camera.position.clone().sub(controls.target);
     const len = THREE.MathUtils.clamp(off.length() * factor, controls.minDistance, controls.maxDistance);
-    goTo({ cam: controls.target.clone().add(off.setLength(len)).toArray(), target: controls.target.toArray(), only });
+    goTo({ cam: controls.target.clone().add(off.setLength(len)).toArray(), target: controls.target.toArray(), only }, dur);
   }
-  function orbit(dTheta, dPhi) {
+  function orbit(dTheta, dPhi, dur) {
     const off = camera.position.clone().sub(controls.target);
     const s = new THREE.Spherical().setFromVector3(off);
     s.theta += dTheta;
     s.phi = THREE.MathUtils.clamp(s.phi + dPhi, controls.minPolarAngle, controls.maxPolarAngle);
-    goTo({ cam: controls.target.clone().add(new THREE.Vector3().setFromSpherical(s)).toArray(), target: controls.target.toArray(), only });
+    goTo({ cam: controls.target.clone().add(new THREE.Vector3().setFromSpherical(s)).toArray(), target: controls.target.toArray(), only }, dur);
   }
 
   // ---------- barra de navegación sobre la escena ----------
@@ -368,11 +381,11 @@ export function mountTypodont(el) {
   card.setAttribute("aria-live", "polite");
   el.appendChild(card);
 
-  // teclado: flechas giran, +/− acercan, 0 restablece
+  // teclado: flechas giran, +/− acercan, 0 restablece. Se repite mucho: respuesta casi inmediata (0.16 s)
   renderer.domElement.addEventListener("keydown", (e) => {
-    const step = 0.35;
-    const act = { ArrowLeft: () => orbit(-step, 0), ArrowRight: () => orbit(step, 0), ArrowUp: () => orbit(0, -step * 0.6),
-                  ArrowDown: () => orbit(0, step * 0.6), "+": () => zoom(0.8), "=": () => zoom(0.8), "-": () => zoom(1.25),
+    const step = 0.35, K = 0.16;
+    const act = { ArrowLeft: () => orbit(-step, 0, K), ArrowRight: () => orbit(step, 0, K), ArrowUp: () => orbit(0, -step * 0.6, K),
+                  ArrowDown: () => orbit(0, step * 0.6, K), "+": () => zoom(0.8, K), "=": () => zoom(0.8, K), "-": () => zoom(1.25, K),
                   0: () => reset(), Escape: () => reset() }[e.key];
     if (act) { e.preventDefault(); act(); }
   });
@@ -476,6 +489,7 @@ export function mountTypodont(el) {
 
   window.addEventListener("themechange", () => {
     stage.applyTheme();
+    neutralGround();
     gumMat.color.copy(gumColor());
     teeth.forEach((t) => { const u = t.mesh.material.userData?.uniforms; if (u) u.uRim.value.set(css("--scene-a")); });
   });
@@ -484,7 +498,7 @@ export function mountTypodont(el) {
   const camDir = new THREE.Vector3(), out = new THREE.Vector3();
   stage.loop((dt) => {
     if (anim.t < 1 && anim.to) {
-      anim.t = Math.min(1, anim.t + dt / 0.7);
+      anim.t = Math.min(1, anim.t + dt / (anim.dur || 0.7));
       const k = easeInOut(anim.t);
       const lerp = (a, b) => a + (b - a) * k;
       applyOpen(lerp(anim.from.open, anim.to.open));

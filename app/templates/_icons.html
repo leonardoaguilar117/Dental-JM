@@ -36,6 +36,10 @@
 {%- elif name == 'menu' %}<path d="M4 6h16M4 12h16M4 18h16"/>
 {%- elif name == 'archive' %}<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4"/>
 {%- elif name == 'more' %}<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>
+{%- elif name == 'sun' %}<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+{%- elif name == 'moon' %}<path d="M20.5 14.1A8.5 8.5 0 1 1 9.9 3.5a6.8 6.8 0 0 0 10.6 10.6z"/>
+{%- elif name == 'eye' %}<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>
+{%- elif name == 'eye-off' %}<path d="M9.9 5.2A9.7 9.7 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.4 3.3M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/>
 {%- elif name == 'lock' %}<rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>
 {%- elif name == 'camera' %}<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>
 {%- elif name == 'file' %}<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>
@@ -52,21 +56,24 @@
 {%- endmacro %}
 
 {% macro avatar(text, color, cls='', photo='') -%}
-<span class="avatar {{ cls }}{{ ' has-photo' if photo }}" style="background: {{ color }}">{% if photo %}<img src="{{ photo }}" alt="" loading="lazy">{% else %}{{ text }}{% endif %}</span>
+<span class="avatar {{ cls }}{{ ' has-photo' if photo }}{{ ' is-art' if photo and '/avatars/' in photo }}" style="--av: {{ color }}">{% if photo %}<img src="{{ photo }}" alt="" loading="lazy">{% else %}{{ text }}{% endif %}</span>
 {%- endmacro %}
 
 {% macro theme_picker(th) -%}
-<div class="theme-pick" data-theme-pick>
-  <button type="button" class="theme-btn" aria-haspopup="true" aria-expanded="false" aria-label="Cambiar tema">
-    {{ icon('palette') }}<span class="dots">{% for c in THEMES[th].swatches[:3] %}<i style="background:{{ c }}"></i>{% endfor %}</span><span class="lbl">{{ THEMES[th].name }}</span>
-  </button>
-  <div class="theme-menu" role="menu">
-    {% for key, t in THEMES.items() %}
-    <button type="button" role="menuitemradio" aria-checked="{{ 'true' if key == th else 'false' }}" data-set-theme="{{ key }}">
-      <span class="chips">{% for c in t.swatches %}<i style="background:{{ c }}"></i>{% endfor %}</span>
-      <span class="tname">{{ t.name }}<small>{{ {'arrecife':'Oscuro · azul profundo y menta','lavanda':'Claro · azul marino y lavanda','grafito':'Claro · gris grafito con lavanda'}[key] }}</small></span>
-    </button>
-    {% endfor %}
-  </div>
-</div>
+{# un solo botón: en claro muestra la luna (pasar a oscuro), en oscuro el sol (pasar a claro) #}
+{% set dark = th == 'noche' %}
+<button type="button" class="theme-toggle" data-theme-toggle aria-pressed="{{ 'true' if dark else 'false' }}"
+        aria-label="Tema oscuro" title="{{ 'Cambiar a tema claro' if dark else 'Cambiar a tema oscuro' }}">
+  <span class="moon">{{ icon('moon') }}</span><span class="sun">{{ icon('sun') }}</span>
+</button>
+{%- endmacro %}
+
+{# marca de Dental JM (logo del consultorio) recoloreada con la paleta; colores en --logo-a / --logo-b #}
+{% macro logo() -%}
+<svg class="logo" viewBox="0 -4 100 104" aria-hidden="true">
+<path class="logo-a" d="M38 19C26 16 10 18 5 28C0 46 12 66 34 96C32 70 33 40 38 19Z"/>
+<path class="logo-a-line" d="M39 21C52 5 74-2 91 12"/>
+<path class="logo-b-line" d="M2 21C20 2 48 6 57 40C63 60 65 80 62 97"/>
+<path class="logo-b" d="M63 15C85 14 100 30 96 50C92 70 76 85 62 97C72 80 83 62 85 46C87 30 78 19 63 15Z"/>
+</svg>
 {%- endmacro %}

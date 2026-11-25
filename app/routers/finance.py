@@ -1,3 +1,4 @@
+import calendar
 import csv
 import io
 
@@ -8,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import get_db
-from ..models import Expense, Payment, Treatment, User
+from ..models import Expense, Patient, Payment, Treatment, User
 from ..services import finance, notifications
-from ..utils import MESES, month_bounds, parse_date, to_float, today_local, whatsapp_link
+from ..utils import MESES, month_bounds, parse_date, safe_next, to_float, to_int, today_local, whatsapp_link
 from ..web import current_user, flash, redirect, render
 
 router = APIRouter()
@@ -43,7 +44,18 @@ def finance_home(request: Request, mes: str | None = None, tab: str = "cobros",
     summary = finance.month_summary(db, user, year, month)
     sales = finance.sales_tickets(db, user, start, end) if user.can_inventory else []
     doctors = db.scalars(select(User).order_by(User.id)).all()
+    # resumen que antes vivía en el inicio: 6 meses, gastos por categoría y tratamientos en proceso
+    chart = finance.series(db, user, year, month, 6)
+    active = sorted(db.scalars(select(Treatment).where(Treatment.status == "en proceso",
+                                                       Treatment.doctor_id == user.id)).all(),
+                    key=lambda t: -t.progress_pct)
+    t = today_local()
+    in_progress = (year, month) == (t.year, t.month)
+    month_days = calendar.monthrange(year, month)[1]
     return render(request, "finance/index.html", db, user, payments=payments, expenses=expenses,
+                  chart=chart, active_treatments=active, in_progress=in_progress, today_day=t.day,
+                  month_days=month_days,
+                  max_cat=max(summary["egresos"]["por_categoria"].values(), default=0),
                   rec_total=rec_total, rec_items=rec_items, debt_links=debt_links, summary=summary,
                   year=year, month=month, month_name=MESES[month - 1], mes=f"{year}-{month:02d}",
                   tab=tab, doctors=doctors, sales=sales, categories=config.EXPENSE_CATEGORIES,
@@ -55,13 +67,20 @@ def finance_home(request: Request, mes: str | None = None, tab: str = "cobros",
 @router.post("/tratamientos/nuevo")
 async def create_treatment(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
     f = await request.form()
-    pid = int(f["patient_id"])
+    pid = to_int(f.get("patient_id"))
+    if not pid or not db.get(Patient, pid):
+        raise HTTPException(404, "Paciente no encontrado")
+    doctor_id = to_int(f.get("doctor_id"), user.id)
+    if not db.get(User, doctor_id):
+        doctor_id = user.id
+    total, discount = max(to_float(f.get("total")), 0), max(to_float(f.get("discount")), 0)
+    status = str(f.get("status") or "presupuesto")
     t = Treatment(
-        patient_id=pid, doctor_id=int(f.get("doctor_id") or user.id),
+        patient_id=pid, doctor_id=doctor_id,
         name=str(f.get("name", "")).strip() or "Tratamiento", description=str(f.get("description", "")).strip(),
-        total=to_float(f.get("total")), discount=to_float(f.get("discount")),
-        sessions_planned=int(f.get("sessions_planned") or 1),
-        status=str(f.get("status") or "presupuesto"),
+        total=total, discount=min(discount, total),
+        sessions_planned=max(to_int(f.get("sessions_planned"), 1) or 1, 1),
+        status=status if status in ("presupuesto", "en proceso") else "presupuesto",
     )
     db.add(t)
     db.flush()
@@ -76,15 +95,18 @@ async def update_treatment(tid: int, request: Request, db: Session = Depends(get
     t = db.get(Treatment, tid)
     if not t:
         raise HTTPException(404)
+    if t.doctor_id != user.id:  # los montos y el avance de un tratamiento son de su doctor
+        flash(request, f"Este tratamiento lo administra {t.doctor.full_name}.", "error")
+        return redirect(f"/pacientes/{t.patient_id}#tratamientos")
     f = await request.form()
-    if "status" in f:
+    if "status" in f and str(f["status"]) in ("presupuesto", "en proceso", "terminado", "cancelado"):
         t.status = str(f["status"])
     if "sessions_done" in f:
-        t.sessions_done = int(f.get("sessions_done") or 0)
+        t.sessions_done = min(max(to_int(f.get("sessions_done"), 0) or 0, 0), 999)
     if "total" in f:
-        t.total = to_float(f.get("total"))
+        t.total = max(to_float(f.get("total")), 0)
     if "discount" in f:
-        t.discount = to_float(f.get("discount"))
+        t.discount = min(max(to_float(f.get("discount")), 0), t.total)
     db.commit()
     flash(request, "Tratamiento actualizado.")
     return redirect(f"/pacientes/{t.patient_id}#tratamientos")
@@ -105,8 +127,10 @@ async def create_payment(request: Request, db: Session = Depends(get_db), user: 
     tid = str(f.get("treatment_id") or "")
     if tid == "nuevo":
         # cobro sin presupuesto previo (consulta, urgencia…): se registra como tratamiento ya terminado
-        pid = int(f.get("patient_id") or 0)
+        pid = to_int(f.get("patient_id"), 0) or 0
         amount = to_float(f.get("amount"))
+        if pid and not db.get(Patient, pid):
+            raise HTTPException(404, "Paciente no encontrado")
         if not pid or amount <= 0:
             flash(request, "Escribe el monto a cobrar.", "error")
             return redirect(f"/pacientes/{pid}?cobrar=1" if pid else "/pacientes")
@@ -138,7 +162,7 @@ async def create_payment(request: Request, db: Session = Depends(get_db), user: 
     owe = (f"El paciente queda a deber ${t.balance:,.2f}." if t.balance > 0
            else "El tratamiento quedó liquidado.")
     flash(request, f"Abono de ${amount:,.2f} cobrado por {t.doctor.short_name}. {owe}")
-    return redirect(str(f.get("next") or f"/pacientes/{t.patient_id}?recibo={p.id}#tratamientos"))
+    return redirect(safe_next(f.get("next"), f"/pacientes/{t.patient_id}?recibo={p.id}#tratamientos"))
 
 
 @router.get("/pagos/{pid}/recibo")
@@ -174,7 +198,9 @@ async def create_expense(request: Request, db: Session = Depends(get_db), user: 
         return redirect("/finanzas?tab=gastos")
     shared = f.get("scope") == "compartido"
     # Un gasto propio siempre es de quien lo registra; en uno compartido se indica quién lo pagó.
-    owner_id = int(f.get("paid_by") or user.id) if shared else user.id
+    owner_id = to_int(f.get("paid_by"), user.id) if shared else user.id
+    if not db.get(User, owner_id):
+        owner_id = user.id
     e = Expense(date=parse_date(f.get("date")) or today_local(), concept=str(f["concept"]).strip(),
                 category=str(f.get("category") or "Otro"), amount=amount, is_shared=shared,
                 owner_id=owner_id, method=str(f.get("method") or "Efectivo"),

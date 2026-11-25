@@ -135,3 +135,39 @@ def month_bounds(year: int, month: int) -> tuple[date, date]:
 def add_months(year: int, month: int, delta: int) -> tuple[int, int]:
     idx = year * 12 + (month - 1) + delta
     return idx // 12, idx % 12 + 1
+
+
+# --- seguridad de entradas ---
+def to_int(value, default: int | None = None) -> int | None:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_next(value, default: str) -> str:
+    """Solo rutas internas: evita redirecciones abiertas (//sitio.com, https://…, \sitio)."""
+    v = str(value or "")
+    if v.startswith("/") and not v.startswith("//") and "\\" not in v and "\n" not in v and "\r" not in v:
+        return v
+    return default
+
+
+def valid_data_image(data: str, prefixes: tuple[str, ...], max_len: int) -> bool:
+    """Valida un data URL de imagen: prefijo permitido, tamaño, base64 correcto y firma real del archivo."""
+    import base64
+    import binascii
+
+    pref = next((p for p in prefixes if data.startswith(p)), None)
+    if not pref or len(data) > max_len:
+        return False
+    try:
+        raw = base64.b64decode(data[len(pref):], validate=True)
+    except (binascii.Error, ValueError):
+        return False
+    magic = {"data:image/png;base64,": b"\x89PNG\r\n\x1a\n", "data:image/jpeg;base64,": b"\xff\xd8\xff",
+             "data:image/webp;base64,": b"RIFF"}
+    return raw.startswith(magic[pref])
+
+
+COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")

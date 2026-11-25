@@ -1,8 +1,9 @@
 // Escena del tablero: molar flotante + anillo orbital (ShaderMaterial) + destellos (Points con shader).
 import * as THREE from "three";
-import { createStage, enamelMaterial, detailedMolarGeometry, contactShadow, css, reduceMotion, hasWebGL } from "./dental3d.js";
+import { createStage, enamelMaterial, detailedMolarGeometry, contactShadow, css, reduceMotion, hasWebGL } from "./dental3d.js?v=4";
 
-const isDark = () => document.documentElement.dataset.theme === "arrecife";
+// el héroe del inicio es azul marino en ambos temas: los destellos siempre van en modo "fondo oscuro"
+const isDark = () => true;
 
 function mountHero(el) {
   if (!hasWebGL()) { el.classList.add("ready"); return; }
@@ -16,6 +17,7 @@ function mountHero(el) {
   // molar anatómico: 4 cúspides con surcos, cuello cervical y 3 raíces
   const mat = enamelMaterial({ color: "#f5f1e8", rim: css("--scene-a"), rimStrength: 0.22 });
   mat.roughness = 0.28;
+  mat.userData.uniforms.uEdge.value = 0.18;
   const molar = new THREE.Mesh(detailedMolarGeometry(), mat);
   molar.castShadow = true;
   molar.scale.setScalar(1.05);

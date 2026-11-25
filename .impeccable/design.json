@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-25T13:30:00-06:00",
+  "title": "Design System: Consultorio Dental JM",
+  "extensions": {
+    "colorMeta": {
+      "marino-jm": { "role": "primary", "displayName": "Marino JM", "canonical": "#012880", "tonalRamp": ["#00113a", "#001a5a", "#012880", "#1846b8", "#4a6fd0", "#8aa2e2", "#c4d1f1", "#e6ebf8"] },
+      "verde-encia": { "role": "secondary", "displayName": "Verde encía", "canonical": "#85b559", "tonalRamp": ["#15270a", "#2c4a14", "#4a7428", "#6e9c45", "#85b559", "#a9cd85", "#cfe4b8", "#eef6e6"] },
+      "lavanda": { "role": "tertiary", "displayName": "Lavanda", "canonical": "#a393be", "tonalRamp": ["#1d1633", "#33264f", "#54447a", "#7d6aa3", "#a393be", "#c2b6d6", "#ddd5ea", "#eee9f6"] },
+      "cielo-lavanda": { "role": "tertiary", "displayName": "Cielo lavanda", "canonical": "#c0cde6", "tonalRamp": ["#1f2542", "#3c4a72", "#6b7ca6", "#97a8cc", "#c0cde6", "#d4ddef", "#e3eaf8", "#f3f6fc"] },
+      "tinta": { "role": "neutral", "displayName": "Tinta", "canonical": "#0d1838" },
+      "gris-salvia": { "role": "neutral", "displayName": "Gris salvia", "canonical": "#55625c" },
+      "rojo-alerta": { "role": "neutral", "displayName": "Rojo alerta", "canonical": "#b4232f" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Saludo del inicio y títulos de página." },
+      "figure": { "displayName": "Cifra", "purpose": "Cifra principal del mes, siempre tabular." }
+    },
+    "shadows": [
+      { "name": "lift", "value": "0 1px 2px rgb(1 40 128 / .06), 0 8px 24px -10px rgb(1 40 128 / .22)", "purpose": "Tarjetas del tablero, día de hoy y hover de mosaicos." },
+      { "name": "fab", "value": "0 0 0 5px var(--frame), 0 10px 22px -6px rgb(1 40 128 / .55)", "purpose": "Botón + central de la barra móvil." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.23, 1, 0.32, 1)", "purpose": "Transiciones de estado y entradas con difuminado." },
+      { "name": "ease-drawer", "value": "cubic-bezier(0.32, 0.72, 0, 1)", "purpose": "Despliegues grandes: héroe, dock, hojas." },
+      { "name": "spring-soft", "value": "cubic-bezier(.3, 1.3, .5, 1)", "purpose": "Rebote leve en chips, mosaicos y círculos." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "560px" },
+      { "name": "tablet", "value": "900px" },
+      { "name": "desktop", "value": "1240px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón primario", "kind": "button", "refersTo": "button-primary",
+      "description": "Acción principal: marino con subrayado verde de tecla física.",
+      "html": "<button class=\"ds-btn-primary\">Agendar cita</button>",
+      "css": ".ds-btn-primary { font: 500 13.5px 'IBM Plex Sans', system-ui, sans-serif; height: 36px; padding: 0 14px; border-radius: 11px; background: #012880; color: #fff; border: 1px solid #012880; border-bottom: 3px solid #85b559; cursor: pointer; transition: transform 140ms cubic-bezier(.23,1,.32,1), background 160ms; } .ds-btn-primary:hover { background: #0a3aa8; } .ds-btn-primary:focus-visible { outline: 2px solid #a393be; outline-offset: 2px; } .ds-btn-primary:active { transform: translateY(1px) scale(.98); border-bottom-width: 1px; }"
+    },
+    {
+      "name": "Botón WhatsApp", "kind": "button", "refersTo": "button-whatsapp",
+      "description": "Todo lo que se manda al paciente.",
+      "html": "<button class=\"ds-btn-wa\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\"><path d=\"M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z\"/></svg> Enviar</button>",
+      "css": ".ds-btn-wa { display: inline-flex; align-items: center; gap: 7px; font: 600 13.5px 'IBM Plex Sans', system-ui, sans-serif; height: 36px; padding: 0 14px; border-radius: 11px; background: #85b559; color: #15270a; border: 1px solid #6e9c45; cursor: pointer; transition: background 160ms; } .ds-btn-wa:hover { background: #6e9c45; } .ds-btn-wa:hover svg { transform: rotate(-12deg) scale(1.08); } .ds-btn-wa svg { transition: transform 220ms; } .ds-btn-wa:focus-visible { outline: 2px solid #012880; outline-offset: 2px; }"
+    },
+    {
+      "name": "Mosaico de acceso rápido", "kind": "custom",
+      "description": "Acción principal del inicio como tarjeta de color con ilustración.",
+      "html": "<a class=\"ds-qa\" href=\"#\"><span class=\"ds-qa-art\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\"><rect x=\"3\" y=\"4.5\" width=\"18\" height=\"16.5\" rx=\"2.5\"/><path d=\"M16 3v3M8 3v3M3 10h18\"/></svg></span><b>Nueva cita</b><small>Agenda y avisa por WhatsApp</small></a>",
+      "css": ".ds-qa { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; gap: 3px; width: 240px; padding: 16px 18px 18px; min-height: 132px; border-radius: 22px; background: #eaf4df; color: #1d3a0b; font-family: 'IBM Plex Sans', system-ui, sans-serif; text-decoration: none; transition: transform 260ms cubic-bezier(.23,1,.32,1), box-shadow 260ms; } .ds-qa::after { content: ''; position: absolute; right: -26px; bottom: -34px; width: 120px; height: 120px; border-radius: 50%; z-index: -1; background: #85b559; opacity: .3; transition: transform 420ms; } .ds-qa-art { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: #85b559; color: #13240a; margin-bottom: 14px; transition: transform 320ms; } .ds-qa b { margin-top: auto; font-size: 16px; } .ds-qa small { font-size: 12.5px; opacity: .8; } .ds-qa:hover { transform: translateY(-3px); box-shadow: 0 1px 2px rgb(1 40 128 / .06), 0 8px 24px -10px rgb(1 40 128 / .22); } .ds-qa:hover .ds-qa-art { transform: rotate(-8deg) scale(1.06); } .ds-qa:hover::after { transform: scale(1.25); } .ds-qa:focus-visible { outline: 2px solid #012880; outline-offset: 3px; }"
+    },
+    {
+      "name": "Chip de día", "kind": "chip", "refersTo": "day-chip-today",
+      "description": "Días de la semana con conteo de citas; hoy en marino.",
+      "html": "<div class=\"ds-days\"><a class=\"ds-day on\"><small>Hoy</small><b>25</b><span>4 citas</span></a><a class=\"ds-day\"><small>Jue</small><b>26</b><span>Libre</span></a></div>",
+      "css": ".ds-days { display: flex; gap: 8px; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-day { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 72px; padding: 10px 4px 9px; border-radius: 16px; background: #f5f6fa; border: 1px solid #e1e5ef; color: #0d1838; cursor: pointer; transition: transform 200ms; } .ds-day small, .ds-day span { font-size: 11.5px; color: #55625c; } .ds-day b { font-size: 20px; font-variant-numeric: tabular-nums; } .ds-day.on { background: #012880; border-color: #012880; color: #fff; } .ds-day.on small, .ds-day.on span { color: #c9d4ee; } .ds-day:not(.on):hover { transform: translateY(-2px); border-color: #a393be; }"
+    },
+    {
+      "name": "Tarjeta", "kind": "card", "refersTo": "card",
+      "description": "Contenedor del tablero con sombra suave en lugar de borde.",
+      "html": "<section class=\"ds-card\"><header>Avisos para hoy</header><p>Valeria Ramírez Soto · Ajuste mensual de ortodoncia</p></section>",
+      "css": ".ds-card { width: 320px; background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgb(1 40 128 / .06), 0 8px 24px -10px rgb(1 40 128 / .22); font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #0d1838; overflow: hidden; } .ds-card header { padding: 14px 18px; border-bottom: 1px solid #edf0f5; font-weight: 600; font-size: 14.5px; } .ds-card p { margin: 0; padding: 16px 18px; font-size: 14px; }"
+    },
+    {
+      "name": "Campo de texto", "kind": "input",
+      "description": "Campos de formularios clínicos.",
+      "html": "<label class=\"ds-field\">Usuario<input type=\"text\" placeholder=\"jimena\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font: 500 13px 'IBM Plex Sans', system-ui, sans-serif; color: #0d1838; width: 260px; } .ds-field input { font: 400 14px 'IBM Plex Sans', system-ui, sans-serif; height: 40px; padding: 0 12px; border-radius: 11px; border: 1px solid #c6cddd; background: #fff; color: #0d1838; transition: border-color 160ms, box-shadow 160ms; } .ds-field input:focus-visible { outline: none; border-color: #012880; box-shadow: 0 0 0 3px #e6ebf8; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La bata y la sonrisa",
+    "overview": "Una herramienta clínica que se siente como una app: precisa y confiable en su base (marino profundo, hojas blancas, números en tipografía tabular) y cálida en los momentos que mueven al doctor a actuar (el verde de la encía en los botones de WhatsApp, tarjetas de color en los accesos rápidos, círculos de pacientes). La estructura es la de un tablero de trabajo; la superficie es la de una app móvil, con esquinas generosas, sombras suaves y botones tipo píldora donde la acción importa.",
+    "keyCharacteristics": [
+      "Marco lavanda (#c0cde6) que envuelve una hoja blanca de esquinas amplias (26px).",
+      "Marino JM (#012880) como color de autoridad: acción principal, día de hoy, héroe del inicio.",
+      "Verde encía (#85b559) para lo que se manda al paciente (WhatsApp) y como subrayado de los botones primarios.",
+      "Tarjetas con sombra suave tintada de marino, sin borde duro, en el tablero.",
+      "3D (molar y tipodonto) como pieza de identidad, no como adorno.",
+      "Temas claro (Lavanda) y oscuro (Noche) a partir de las mismas variables."
+    ],
+    "rules": [
+      { "name": "The Encía Rule", "body": "El verde se reserva para lo que sale hacia el paciente (WhatsApp, confirmaciones) y para el subrayado del botón primario. No es un color decorativo.", "section": "colors" },
+      { "name": "The One Navy Moment Rule", "body": "Por pantalla hay un solo bloque grande en marino sólido (el héroe o el mosaico destacado); el resto del marino vive en botones y texto.", "section": "colors" },
+      { "name": "The Tabular Money Rule", "body": "Toda cifra, hora o fecha numérica usa font-variant-numeric: tabular-nums.", "section": "typography" },
+      { "name": "The Lift-Not-Line Rule", "body": "En el tablero, una tarjeta se separa del fondo con sombra suave, no con borde de 1px (salvo en tema noche).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do sacar todo color de las variables del tema (--primary, --accent, --qa-*, --hero-strong*) para que el tema noche funcione solo.",
+      "Do usar el verde encía (#85b559) solo para acciones hacia el paciente y el subrayado primario.",
+      "Do usar cifras tabulares en dinero, horas y fechas.",
+      "Do escalonar las entradas por tipo de bloque (despliegue en el héroe, difuminado en tarjetas, rebote leve en mosaicos y chips) y respetar prefers-reduced-motion.",
+      "Do usar el logo Dental JM (macro logo) como marca; nunca otro ícono de diente genérico en su lugar."
+    ],
+    "donts": [
+      "Don't inventar testimonios, reseñas, cifras ni pacientes; solo datos reales del consultorio.",
+      "Don't introducir colores fuera de la paleta Lavanda ni otra familia tipográfica.",
+      "Don't poner tarjetas dentro de tarjetas.",
+      "Don't usar texto con degradado ni vidrio esmerilado decorativo."
+    ]
+  }
+}

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Odentia · Tríptico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Identidad del software (tema Lavanda) */
+:root{
+  --frame:#c0cde6; --frame-deep:#a393be; --navy:#012880; --navy-2:#0a3aa8; --frame-muted:#3c4a72;
+  --ink:#0d1838; --muted:#4d5876; --sheet:#fff; --raised:#f5f6fa; --active:#edf0f7; --border:#e1e5ef; --rule:#edf0f5;
+  --accent:#85b559; --accent-deep:#6e9c45; --accent-ink:#15270a; --accent-tint:#eef6e6;
+  --lilac:#a393be; --teal:#418d96; --hero:#eef1f9; --data-tint:#e6ebf8;
+  --font:"IBM Plex Sans",system-ui,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@page{size:11in 8.5in;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#8f9bb8}
+body{font-family:var(--font);color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:9.6pt;line-height:1.42}
+.page{width:11in;height:8.5in;margin:.35in auto;display:grid;background:var(--sheet);overflow:hidden;position:relative;box-shadow:0 20px 50px -20px rgba(1,40,128,.45)}
+.outside{grid-template-columns:3.69in 3.69in 3.62in}
+.inside{grid-template-columns:3.62in 3.69in 3.69in}
+@media print{html,body{background:none}.page{margin:0;box-shadow:none;break-after:page}}
+.panel{position:relative;padding:.42in .36in .36in;display:flex;flex-direction:column;overflow:hidden}
+.panel + .panel{border-left:1px dashed rgba(1,40,128,.10)}
+@media print{.panel + .panel{border-left:0}}
+
+/* piezas comunes */
+.mark{width:.46in;height:.46in;border-radius:.14in;background:var(--navy);color:var(--frame);display:grid;place-items:center;flex:none}
+.mark svg{width:.27in;height:.27in}
+.brand{display:flex;align-items:center;gap:.12in}
+.brand b{font-size:17pt;font-weight:600;letter-spacing:-.02em;color:var(--navy);line-height:1}
+.brand span{display:block;font-size:7.6pt;color:var(--frame-muted);font-weight:500;margin-top:3px;letter-spacing:.01em}
+.eyebrow{font-size:7.6pt;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#2f6c74}
+h2{font-size:15.5pt;line-height:1.12;letter-spacing:-.025em;font-weight:600;color:var(--navy);margin:.06in 0 .14in;text-wrap:balance}
+.lead{font-size:9.6pt;color:var(--muted);margin-bottom:.14in}
+ul.ticks{list-style:none;display:grid;gap:.06in}
+ul.ticks li{display:grid;grid-template-columns:.2in 1fr;align-items:start;font-size:9.6pt;line-height:1.36}
+ul.ticks li::before{content:"";width:.13in;height:.13in;border-radius:4px;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2315270a' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/78% no-repeat;margin-top:.025in}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:7.4pt;font-weight:600;padding:3px 8px;border-radius:6px;background:var(--data-tint);color:var(--navy)}
+.pill.ok{background:#e6f2da;color:#24420f}
+.shot{border-radius:10px;border:1px solid var(--border);overflow:hidden;background:var(--frame);box-shadow:0 10px 24px -14px rgba(1,40,128,.45)}
+.shot img{display:block;width:100%;height:100%;object-fit:cover}
+.shot.agenda img{object-view-box:inset(589px 560px 241px 1130px);object-position:left top}
+.shot.typo img{object-view-box:inset(953px 1015px 347px 479px);object-position:center}
+.shot.cover img{object-view-box:inset(0 940px 943px 0);object-position:left top}
+.shot.timeline img{object-view-box:inset(890px 1178px 491px 244px);object-position:left center}
+.cap{font-size:7.6pt;color:var(--muted);margin-top:.06in}
+.btn{display:inline-flex;align-items:center;gap:.08in;background:var(--navy);color:#fff;font-weight:600;border-radius:9px;padding:.09in .16in;border-bottom:3px solid var(--accent);font-size:10pt;text-decoration:none}
+
+/* ---------- EXTERIOR ---------- */
+.flap{background:var(--sheet)}
+.pain{display:grid;gap:.07in;margin:.04in 0 .2in}
+.pain div{display:grid;grid-template-columns:.24in 1fr;align-items:center;background:#fbe9ec;color:#7e1823;border-radius:9px;padding:.07in .1in;font-size:9.1pt;font-weight:500}
+.pain svg{width:.15in;height:.15in;color:#b4232f}
+.solution{background:var(--hero);border:1px solid var(--border);border-radius:12px;padding:.16in .18in;margin-bottom:.18in}
+.solution p{font-size:9.6pt}
+.solution .big{font-size:12pt;font-weight:600;color:var(--navy);letter-spacing:-.01em;line-height:1.25;margin-bottom:.06in}
+.who{margin-top:auto;border-top:1px solid var(--rule);padding-top:.14in}
+.who b{color:var(--navy)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:.08in}
+
+.back{background:var(--frame);color:var(--ink)}
+.back h2{font-size:17pt}
+.card{background:var(--sheet);border:1px solid #aebddc;border-radius:12px;padding:.18in}
+.contact .name{font-size:12.5pt;font-weight:600;color:var(--navy);letter-spacing:-.01em}
+.contact .role{font-size:8pt;color:var(--muted);margin-bottom:.12in}
+.contact .line{display:grid;grid-template-columns:.3in 1fr;align-items:center;font-size:10pt;margin-top:.07in}
+.contact .line svg{width:.18in;height:.18in;color:var(--navy)}
+.contact .phone{font-weight:600;font-size:14pt;font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--navy)}
+.qrrow{display:grid;grid-template-columns:1.05in 1fr;gap:.16in;align-items:center;margin-top:.18in}
+.qr{background:#fff;border-radius:10px;padding:.08in;border:1px solid #aebddc}
+.qr img{width:100%;display:block}
+.qrrow p{font-size:8.8pt;color:var(--frame-muted)}
+.qrrow b{color:var(--navy)}
+.why{margin-top:.28in}
+.signoff{margin-top:auto;display:flex;align-items:center;gap:.1in;padding-top:.16in;border-top:1px solid #aebddc}
+.signoff .mark{width:.34in;height:.34in;border-radius:.1in}
+.signoff .mark svg{width:.2in;height:.2in}
+.signoff b{color:var(--navy);font-size:11pt}
+.signoff span{font-size:7.8pt;color:var(--frame-muted)}
+.why h3{font-size:9.6pt;color:var(--navy);margin-bottom:.08in}
+.why ul{list-style:none;display:grid;gap:.06in}
+.why li{display:grid;grid-template-columns:.24in 1fr;font-size:8.9pt;align-items:start}
+.why li i{width:.17in;height:.17in;border-radius:5px;background:var(--navy);color:var(--frame);display:grid;place-items:center;font-style:normal;font-size:7pt;font-weight:700;margin-top:1px}
+
+.cover{background:var(--navy);color:#fff}
+.cover .brand b{color:#fff}.cover .brand > span:last-child span{color:var(--frame)}
+.cover .mark{background:var(--frame);color:var(--navy)}
+.cover h1{font-size:33pt;line-height:1.02;letter-spacing:-.04em;font-weight:600;margin:.42in 0 .14in;text-wrap:balance}
+.cover h1 em{font-style:normal;color:var(--accent)}
+.cover .sub{font-size:10pt;color:#d6def0;line-height:1.45;max-width:3in}
+.nom{display:inline-flex;align-items:center;gap:.08in;margin-top:.2in;border:1px solid rgba(192,205,230,.4);border-radius:9px;padding:.07in .12in;font-size:7.8pt;color:var(--frame);font-weight:500;align-self:flex-start}
+.nom svg{width:.17in;height:.17in;color:var(--accent);flex:none}
+.cover .shot{margin:auto 0 0 -.36in;height:2.3in;border-radius:0 14px 14px 0;border:0;box-shadow:0 -10px 40px rgba(0,0,0,.35)}
+.cover .orbit{position:absolute;right:-1.1in;top:1.9in;width:2.6in;height:2.6in;border-radius:50%;border:1px dashed rgba(192,205,230,.25)}
+.cover .orbit.o2{right:-.6in;top:2.4in;width:1.6in;height:1.6in;border-color:rgba(133,181,89,.35)}
+
+/* ---------- INTERIOR ---------- */
+.feat{padding-top:.38in}
+.feat .num{font-family:var(--mono);font-size:8pt;color:var(--frame-muted);font-weight:500}
+.p-agenda{background:var(--sheet)}
+.p-exp{background:var(--hero)}
+.p-cobro{background:var(--sheet)}
+.feat .shot{height:1.95in;margin:.02in 0 .12in}
+.p-exp .shot{height:1.5in;background:#e3e9f5}
+.wa{margin-top:auto;display:grid;grid-template-columns:auto 1fr;gap:.1in;align-items:center;background:var(--accent-tint);border-radius:10px;padding:.11in .13in;font-size:8.6pt}
+.wa .ic{width:.3in;height:.3in;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+.wa .ic svg{width:.17in;height:.17in}
+.wa b{color:var(--accent-ink)}
+.trust{margin-top:auto;background:var(--navy);color:#e9eef9;border-radius:12px;padding:.15in .16in;font-size:8.1pt;line-height:1.42}
+.trust h3{font-size:9.6pt;color:#fff;display:flex;align-items:center;gap:.07in;margin-bottom:.06in}
+.trust h3 svg{width:.17in;height:.17in;color:var(--accent)}
+.trust b{color:#fff}
+.trust .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:.08in}
+.trust .tags span{font-size:7.6pt;font-weight:600;border-radius:5px;padding:2px 6px;background:rgba(192,205,230,.16);color:var(--frame)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:.02in 0 .18in}
+.kpi-cap{font-size:7.6pt;color:var(--muted);margin:-.1in 0 .16in}
+.kpis > div{padding:.1in .13in}
+.kpis > div+div{border-left:1px solid var(--rule)}
+.kpis small{display:flex;align-items:center;gap:5px;font-size:7.4pt;color:var(--muted);font-weight:500}
+.kpis small::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--navy)}
+.kpis > div+div small::before{background:var(--lilac)}
+.kpis b{display:block;font-size:15pt;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink);margin-top:2px}
+.kpis .bar{height:5px;border-radius:99px;background:var(--active);margin-top:6px;overflow:hidden}
+.kpis .bar span{display:block;height:100%;width:34%;background:var(--teal)}
+.kpis > div+div .bar span{width:66%;background:#b4232f}
+.kpis > div+div b{color:#b4232f}
+.cta{margin-top:auto;border-radius:12px;background:var(--frame);padding:.15in .16in;display:grid;gap:.08in}
+.cta p{font-size:8.8pt;color:var(--frame-muted)}
+.cta .btn{justify-content:center}
+.cta.demo{gap:.07in;padding:.13in .15in}
+.demo-h{font-size:12pt;font-weight:600;color:var(--navy);letter-spacing:-.01em;line-height:1.15}
+.demo-h small{display:block;font-size:7.2pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--frame-muted);margin-bottom:2px}
+.cta.demo .qrrow{margin-top:0;grid-template-columns:.95in 1fr;gap:.13in}
+.cta.demo .tel{white-space:nowrap}
+.cta .web{font-size:8.8pt;color:var(--frame-muted)}
+.cta .web a{color:var(--navy);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.devices{display:flex;gap:.08in;align-items:center;font-size:7.8pt;color:var(--muted);margin-top:.12in}
+.devices.end{margin-top:auto;background:var(--raised);border:1.5px solid var(--box-soft);border-radius:10px;padding:.1in .12in;font-size:8.4pt;color:var(--ink)}
+.devices svg{width:.16in;height:.16in;color:var(--navy)}
+.mini{border:1px solid var(--border);border-radius:10px;background:#fff;padding:.1in .12in;margin:.04in 0 .14in;font-size:8.4pt}
+.mini .lbl{font-size:7.2pt;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--frame-muted);margin-bottom:.05in;display:flex;justify-content:space-between;align-items:center}
+.alert{display:grid;grid-template-columns:.22in 1fr;gap:.04in;background:#fbf3df;color:#6f4708;border-radius:8px;padding:.07in .09in;font-size:8.3pt;line-height:1.35}
+.alert svg{width:.16in;height:.16in;color:#b7791f;margin-top:1px}
+.alert b{color:#5a3905}
+.teeth{display:flex;gap:3px;margin:.02in 0 .06in}
+.teeth span{flex:1;height:.3in;border-radius:5px 5px 8px 8px;border:1px solid #c6cddd;font:600 6.4pt var(--mono);display:grid;place-items:end center;padding-bottom:2px;color:#55625c;background:#f3f5f8}
+.teeth .c{background:#c4242a;color:#fff;border-color:#a31d22}.teeth .o{background:#0ea1d2;color:#fff;border-color:#0b86af}
+.teeth .e{background:#6c4813;color:#fff;border-color:#573a0f}.teeth .k{background:#e2f8af;border-color:#b8d483}
+.legend{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:7.4pt;color:var(--muted)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.cpod{font-family:var(--mono);font-size:7.6pt;color:var(--navy);background:var(--data-tint);border-radius:5px;padding:1px 6px;letter-spacing:0;text-transform:none}
+.receipt .row{display:flex;justify-content:space-between;font-size:8.4pt;padding:2px 0;font-variant-numeric:tabular-nums}
+.receipt .row + .row{border-top:1px dashed var(--border)}
+.receipt .row b{font-weight:600}
+.receipt .owe b{color:#b4232f}
+.receipt .send{display:inline-flex;align-items:center;gap:5px;margin-top:.06in;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:7.8pt;border-radius:6px;padding:3px 8px}
+.receipt .send svg{width:.12in;height:.12in}
+/* bordes con color por sección */
+.p-agenda{--box:#418d96;--box-soft:#e3f0f1}
+.p-exp{--box:#3a57b5;--box-soft:#e1e8f8}
+.p-cobro{--box:#6e9c45;--box-soft:#eef6e6}
+.feat .mini,.feat .kpis,.feat .shot{border:2px solid var(--box);box-shadow:0 0 0 4px var(--box-soft)}
+.feat .mini .lbl{color:var(--box)}
+.feat .wa{border:2px solid #6e9c45}
+.feat .trust{border:2px solid #0a3aa8;box-shadow:0 0 0 4px #e1e8f8}
+.feat .receipt .row + .row{border-top:1.5px dashed #b8d483}
+.kpis > div+div{border-left:1.5px solid var(--box-soft)}
+.pain div{border:1.5px solid #e6a3ad}
+.solution{border:2px solid #3a57b5 !important;box-shadow:0 0 0 4px #e1e8f8}
+.flap .shot{border:2px solid #418d96;box-shadow:0 0 0 4px #e3f0f1}
+.back .card{border:2px solid var(--navy)}
+.qr{border:1.5px solid var(--navy) !important}
+</style>
+</head>
+<body>
+
+<!-- ===================== HOJA 1 ===================== -->
+<section class="page outside" aria-label="Hoja 1 del tríptico">
+
+  <!-- Portada -->
+  <div class="panel cover">
+    <span class="orbit"></span><span class="orbit o2"></span>
+    <div class="brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4 8.6 3 6.8 3.4 4.2 4 3 6.6 3.6 9.6c.4 2 1.3 3.4 1.8 5.4.6 2.6.9 6 2.6 6 1.9 0 1.6-4.9 4-4.9s2.1 4.9 4 4.9c1.7 0 2-3.4 2.6-6 .5-2 1.4-3.4 1.8-5.4.6-3-.6-5.6-3.2-6.2C15.4 3 13.5 4 12 5.5z"/></svg></span>
+      <span><b>Odentia</b><span>Software para consultorios dentales</span></span>
+    </div>
+    <h1>Atienda pacientes, <em>no papeles.</em></h1>
+    <p class="sub">Agenda, historia clínica y cobros en un solo lugar. Desde su computadora, tableta o celular.</p>
+    <div class="nom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z"/><path d="M8.8 12.2l2.3 2.3 4.2-4.6"/></svg>Diseñado conforme a NOM-004-SSA3-2012 y NOM-013-SSA2-2015</div>
+    <div class="shot cover"><img src="img/dashboard.png" alt="Pantalla de inicio de Odentia"></div>
+  </div>
+
+  <!-- El problema -->
+  <div class="panel flap">
+    <div class="eyebrow">El día a día del consultorio</div>
+    <h2>¿Le suena familiar?</h2>
+    <div class="pain">
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Citas empalmadas y pacientes que no llegan.</div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h4"/></svg>Expedientes en papel, incompletos o ilegibles.</div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3S9.5 10.4 12 11s4.5 1.7 4.5 3.7-2 3.3-4.5 3.3-4.5-1.3-4.5-3"/></svg>No sabe con exactitud quién le debe y cuánto.</div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>Pacientes que olvidan su siguiente revisión.</div>
+    </div>
+    <div class="solution">
+      <p class="big">Con Odentia, cada cita, cada nota y cada peso quedan registrados y a un clic.</p>
+      <p>Usted se dedica a la odontología. Odentia se encarga del orden.</p>
+    </div>
+    <div class="shot timeline" style="height:1.1in"><img src="img/dashboard.png" alt="Jornada del día por doctor en Odentia"></div>
+    <p class="cap">La jornada de hoy de cada doctor, de un vistazo.</p>
+    <div class="who">
+      <b>¿Para quién?</b> Consultorios individuales y clínicas con varios doctores y especialidades.
+      <div class="chips"><span class="pill">Odontología general</span><span class="pill">Ortodoncia</span><span class="pill">Estética</span><span class="pill">Multiconsultorio</span></div>
+    </div>
+  </div>
+  <div class="panel feat p-agenda">
+    <span class="num">01 · AGENDA</span>
+    <h2>Una agenda que trabaja por usted</h2>
+    <div class="shot agenda"><img src="img/agenda.png" alt="Agenda semanal con un color por doctor"></div>
+    <div class="mini">
+      <div class="lbl">Antes de agendar</div>
+      <div class="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></svg>
+        <span><b>Conflicto de horario:</b> Dr. Miguel Ángel ya tiene cita de 10:00 a 11:00.</span></div>
+    </div>
+    <ul class="ticks">
+      <li>Calendario por doctor, con un color para cada uno.</li>
+      <li>Sus citas sincronizadas con Google Calendar.</li>
+      <li>Recordatorios de limpieza, revisión y control.</li>
+      <li>Avisos de saldos pendientes, listos para enviar.</li>
+    </ul>
+    <div class="wa">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/></svg></span>
+      <span><b>Confirme la cita de mañana por WhatsApp</b> con un clic: el mensaje ya va escrito.</span>
+    </div>
+  </div>
+
+</section>
+
+<!-- ===================== HOJA 2 ===================== -->
+<section class="page inside" aria-label="Hoja 2 del tríptico">
+
+  <div class="panel feat p-exp">
+    <span class="num">02 · EXPEDIENTE CLÍNICO</span>
+    <h2>Expediente clínico diseñado conforme a la norma</h2>
+    <div class="shot typo"><img src="img/paciente.png" alt="Tipodonto 3D del paciente con brackets"></div>
+    <div class="mini">
+      <div class="lbl">Odontograma <span class="cpod">CPOD 6</span></div>
+      <div class="teeth"><span>18</span><span>17</span><span class="c">16</span><span>15</span><span class="o">14</span><span>13</span><span>12</span><span class="k">11</span><span class="k">21</span><span>22</span><span>23</span><span>24</span><span class="o">25</span><span class="e">26</span><span>27</span><span>28</span></div>
+      <div class="legend"><span><i style="background:#c4242a"></i>Caries</span><span><i style="background:#0ea1d2"></i>Obturado</span><span><i style="background:#6c4813"></i>Endodoncia</span><span><i style="background:#e2f8af;outline:1px solid #b8d483"></i>Corona</span></div>
+    </div>
+    <ul class="ticks">
+      <li>Ficha con CURP, antecedentes y alertas médicas.</li>
+      <li>Signos vitales y exploración por aparatos y sistemas.</li>
+      <li>Consentimiento firmado en pantalla, con testigos.</li>
+      <li>Notas que no se pueden alterar, con su cédula.</li>
+    </ul>
+    <div class="trust">
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z"/><path d="M8.8 12.2l2.3 2.3 4.2-4.6"/></svg>Cumplimiento y confianza</h3>
+      Diseñado conforme a la <b>NOM-004-SSA3-2012</b> (expediente clínico) y la <b>NOM-013-SSA2-2015</b> (salud bucal). Bitácora de quién consultó o modificó cada expediente y registro del aviso de privacidad.
+      <div class="tags"><span>Conexión cifrada</span><span>Bloqueo ante intentos repetidos</span><span>Aviso de privacidad (LFPDPPP)</span><span>Expediente imprimible</span></div>
+    </div>
+  </div>
+
+  <div class="panel feat p-cobro">
+    <span class="num">03 · COBROS Y FINANZAS</span>
+    <h2>Cobre y sepa al momento cuánto le deben</h2>
+    <div class="kpis">
+      <div><small>Pagado</small><b>$9,600</b><div class="bar"><span></span></div></div>
+      <div><small>Saldo pendiente</small><b>$18,400</b><div class="bar"><span></span></div></div>
+    </div>
+    <p class="kpi-cap">Así ve el saldo de cada paciente: lo pagado y lo que falta.</p>
+    <div class="mini receipt">
+      <div class="lbl">Recibo de pago</div>
+      <div class="row"><span>Abono · Transferencia</span><b>$2,000.00</b></div>
+      <div class="row owe"><span>Queda a deber</span><b>$18,400.00</b></div>
+      <span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/></svg>Enviar comprobante por WhatsApp</span>
+    </div>
+    <ul class="ticks">
+      <li>Presupuestos y recibos imprimibles en segundos.</li>
+      <li>Cada doctor ve solo sus propios ingresos.</li>
+      <li>Gastos compartidos repartidos por porcentaje.</li>
+      <li>Ingresos, egresos y utilidad del mes, exportables a Excel.</li>
+    </ul>
+    <div class="devices end">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18h2"/></svg>
+      Funciona en el navegador de su computadora, tableta o celular, sin instalar nada.
+    </div>
+  </div>
+  <!-- Contacto (al final) -->
+  <div class="panel back">
+    <div class="eyebrow" style="color:var(--navy)">Atención personal</div>
+    <h2>Agende su demostración gratuita</h2>
+    <p class="lead" style="color:var(--frame-muted)">Le mostramos Odentia funcionando con un consultorio de ejemplo. Después lo instalamos, configuramos y capacitamos.</p>
+    <div class="card contact">
+      <div class="name">Leonardo Aguilar Martínez</div>
+      <div class="role">Asesor comercial · Odentia</div>
+      <div class="line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/></svg><span><span class="phone">55 7196 2228</span><br><small style="color:var(--muted)">WhatsApp y llamadas</small></span></div>
+      <div class="line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 6.5l8.5 6 8.5-6"/></svg><span>leonardogrl18@gmail.com</span></div>
+      <div class="qrrow">
+        <div class="qr"><img src="img/qr-whatsapp.svg" alt="Código QR para escribir por WhatsApp"></div>
+        <p>Escanee y escríbanos <b>«DEMO»</b> por WhatsApp. Le respondemos el mismo día.</p>
+      </div>
+      <div class="line web"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.8 3.8 5.8 3.8 9s-1.2 6.2-3.8 9c-2.6-2.8-3.8-5.8-3.8-9S9.4 5.8 12 3z"/></svg><span><a href="https://dental-jm.onrender.com/">dental-jm.onrender.com</a><br><small style="color:var(--muted)">Véalo en línea</small></span></div>
+    </div>
+    <div class="why">
+      <h3>¿Por qué con nosotros?</h3>
+      <ul>
+        <li><i>1</i><span>Lo dejamos listo y configurado con sus doctores y tratamientos.</span></li>
+        <li><i>2</i><span>Lo capacitamos a usted y a su equipo, en el consultorio o en línea.</span></li>
+        <li><i>3</i><span>Soporte directo por WhatsApp con una persona real.</span></li>
+      </ul>
+    </div>
+    <div class="signoff">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4 8.6 3 6.8 3.4 4.2 4 3 6.6 3.6 9.6c.4 2 1.3 3.4 1.8 5.4.6 2.6.9 6 2.6 6 1.9 0 1.6-4.9 4-4.9s2.1 4.9 4 4.9c1.7 0 2-3.4 2.6-6 .5-2 1.4-3.4 1.8-5.4.6-3-.6-5.6-3.2-6.2C15.4 3 13.5 4 12 5.5z"/></svg></span>
+      <div><b>Odentia</b><br><span>Software para consultorios dentales · Hecho en México</span></div>
+    </div>
+  </div>
+
+</section>
+</body>
+</html>

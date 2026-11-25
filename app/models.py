@@ -16,6 +16,16 @@ def _now() -> datetime:
     return now_local()
 
 
+AVATARS_PER_SEX = 15  # app/static/img/avatars/{f,m}01..15.svg (tools/gen_avatars.py)
+
+
+def avatar_art(sex: str, key: int) -> str:
+    """Avatar ilustrado fijo para una persona: misma persona, mismo avatar. 7 es coprimo con 15,
+    así que expedientes consecutivos reciben avatares distintos."""
+    prefix = "m" if sex == "Masculino" else "f"
+    return f"/static/img/avatars/{prefix}{(key * 7) % AVATARS_PER_SEX + 1:02d}.svg"
+
+
 class User(Base):
     """Doctores con acceso al sistema (los únicos usuarios)."""
 
@@ -33,6 +43,18 @@ class User(Base):
     ical_token: Mapped[str] = mapped_column(String(64), default="")
     gcal_calendar_id: Mapped[str] = mapped_column(String(255), default="")
     photo: Mapped[str] = mapped_column(Text, default="")  # foto del doctor (JPEG en data URL, 320×320)
+    # NOM-004-SSA3-2012: nombre completo, cédula profesional e institución que la expide en cada nota
+    cedula: Mapped[str] = mapped_column(String(20), default="")
+    cedula_especialidad: Mapped[str] = mapped_column(String(20), default="")
+    universidad: Mapped[str] = mapped_column(String(120), default="")
+
+    @property
+    def avatar_src(self) -> str:
+        """Su foto si subió una; si no, un avatar ilustrado ("Dra." → femenino, "Dr." → masculino)."""
+        if self.photo:
+            return self.photo
+        sex = "Femenino" if self.short_name.lower().startswith("dra") else "Masculino"
+        return avatar_art(sex, (self.id or 0) + 11)
 
     @property
     def initials(self) -> str:
@@ -70,6 +92,9 @@ class Patient(Base):
     occupation: Mapped[str] = mapped_column(String(80), default="")
     emergency_contact: Mapped[str] = mapped_column(String(160), default="")
     referred_by: Mapped[str] = mapped_column(String(120), default="")
+    curp: Mapped[str] = mapped_column(String(18), default="")
+    estado_civil: Mapped[str] = mapped_column(String(20), default="")
+    lugar_nacimiento: Mapped[str] = mapped_column(String(80), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     primary_doctor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -97,6 +122,10 @@ class Patient(Base):
     @property
     def initials(self) -> str:
         return (self.first_name[:1] + self.last_name[:1]).upper()
+
+    @property
+    def avatar_src(self) -> str:
+        return avatar_art(self.sex, self.id or 0)
 
     @property
     def age(self) -> int | None:
@@ -153,6 +182,25 @@ class MedicalHistory(Base):
     lengua_notas: Mapped[str] = mapped_column(Text, default="")
     encia_hallazgos: Mapped[str] = mapped_column(Text, default="[]")
     encia_notas: Mapped[str] = mapped_column(Text, default="")
+    # --- NOM-004-SSA3-2012 / NOM-013-SSA2-2015 ---
+    grupo_sanguineo: Mapped[str] = mapped_column(String(14), default="")
+    aparatos_json: Mapped[str] = mapped_column(Text, default="{}")  # interrogatorio por aparatos y sistemas
+    habitus_exterior: Mapped[str] = mapped_column(Text, default="")
+    frecuencia_cardiaca: Mapped[str] = mapped_column(String(12), default="")
+    frecuencia_respiratoria: Mapped[str] = mapped_column(String(12), default="")
+    temperatura: Mapped[str] = mapped_column(String(12), default="")
+    peso: Mapped[str] = mapped_column(String(12), default="")
+    talla: Mapped[str] = mapped_column(String(12), default="")
+    exploracion_atm: Mapped[str] = mapped_column(Text, default="")
+    indice_placa: Mapped[str] = mapped_column(String(60), default="")
+    estudios_complementarios: Mapped[str] = mapped_column(Text, default="")  # laboratorio y gabinete (radiografías)
+    # consentimiento informado: acto autorizado, riesgos/beneficios, contingencias, calidad de quien firma, testigos
+    consentimiento_acto: Mapped[str] = mapped_column(Text, default="")
+    consentimiento_riesgos: Mapped[str] = mapped_column(Text, default="")
+    consentimiento_calidad: Mapped[str] = mapped_column(String(30), default="Paciente")
+    consentimiento_testigo1: Mapped[str] = mapped_column(String(160), default="")
+    consentimiento_testigo2: Mapped[str] = mapped_column(String(160), default="")
+    aviso_privacidad_fecha: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     consentimiento_firmado: Mapped[bool] = mapped_column(Boolean, default=False)
     # firma autógrafa capturada en pantalla (PNG en data URL), quién firmó y cuándo
     consentimiento_firma: Mapped[str] = mapped_column(Text, default="")
@@ -179,6 +227,23 @@ class MedicalHistory(Base):
             return [str(x) for x in v] if isinstance(v, list) else []
         except ValueError:
             return []
+
+    @property
+    def aparatos(self) -> dict:
+        try:
+            v = json.loads(self.aparatos_json or "{}")
+            return {str(k): str(x) for k, x in v.items()} if isinstance(v, dict) else {}
+        except ValueError:
+            return {}
+
+    @property
+    def cpod(self) -> dict:
+        """Índice CPOD (cariados, perdidos, obturados) calculado del odontograma (NOM-013-SSA2-2015)."""
+        odo = self.odontograma
+        c = sum(1 for v in odo.values() if v == "caries")
+        p = sum(1 for v in odo.values() if v in ("ausente", "extraido", "extraer"))
+        o = sum(1 for v in odo.values() if v in ("obturado", "endodoncia", "corona"))
+        return {"c": c, "p": p, "o": o, "total": c + p + o}
 
     @property
     def lengua_list(self) -> list[str]:
@@ -218,9 +283,31 @@ class ClinicalNote(Base):
     teeth: Mapped[str] = mapped_column(String(80), default="")
     note: Mapped[str] = mapped_column(Text, default="")
     next_step: Mapped[str] = mapped_column(String(255), default="")
+    # NOM-004-SSA3-2012, 7: signos vitales, diagnóstico, estudios e indicación terapéutica (fármaco, dosis, vía, periodicidad)
+    kind: Mapped[str] = mapped_column(String(30), default="Evolución")
+    vitals: Mapped[str] = mapped_column(String(160), default="")
+    diagnosis: Mapped[str] = mapped_column(String(255), default="")
+    studies: Mapped[str] = mapped_column(Text, default="")
+    indications: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)  # hora real de captura; la nota no se edita
 
     patient: Mapped[Patient] = relationship(back_populates="notes_list")
     doctor: Mapped[User] = relationship()
+
+
+class AuditLog(Base):
+    """Bitácora de accesos y cambios al expediente (confidencialidad, NOM-004-SSA3-2012 y LFPDPPP)."""
+
+    __tablename__ = "audit_logs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(40))
+    detail: Mapped[str] = mapped_column(String(400), default="")
+    ip: Mapped[str] = mapped_column(String(45), default="")
+
+    user: Mapped[User | None] = relationship()
 
 
 class Appointment(Base):

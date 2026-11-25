@@ -110,6 +110,8 @@ function initCounters() {
     const money = el.dataset.money !== undefined;
     if (!isFinite(target)) return;
     const final = el.textContent;
+    el.textContent = fmt(0, money);  // arranca en cero y cuenta cuando termina la entrada desde el login
+    (window.jmAfterEnter || ((f) => f()))(() => {
     const t0 = performance.now(), dur = 650;
     const step = (now) => {
       const p = Math.min(1, (now - t0) / dur);
@@ -118,6 +120,7 @@ function initCounters() {
       if (p < 1) requestAnimationFrame(step); else el.textContent = final;
     };
     requestAnimationFrame(step);
+    });
   });
 }
 
@@ -145,39 +148,35 @@ document.addEventListener("click", (e) => {
   if (form) setTimeout(() => form.submit(), 400);
 });
 
-// ---- Temas: crossfade de toda la página con View Transitions ----
+// ---- Tema claro/oscuro: un solo botón; el tema nuevo se expande en círculo desde el botón ----
 function initThemePicker() {
-  document.querySelectorAll("[data-theme-pick]").forEach((pick) => {
-    const btn = pick.querySelector(".theme-btn");
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const open = pick.classList.toggle("open");
-      btn.setAttribute("aria-expanded", open);
-    });
-    pick.querySelectorAll("[data-set-theme]").forEach((opt) => opt.addEventListener("click", () => {
-      const key = opt.dataset.setTheme;
-      pick.classList.remove("open");
-      applyTheme(key, opt);
-    }));
-  });
-  document.addEventListener("click", () => document.querySelectorAll("[data-theme-pick].open").forEach((p) => p.classList.remove("open")));
+  document.querySelectorAll("[data-theme-toggle]").forEach((btn) => btn.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "noche" ? "lavanda" : "noche";
+    const r = btn.getBoundingClientRect();
+    applyTheme(next, r.left + r.width / 2, r.top + r.height / 2);
+  }));
 }
-function applyTheme(key, opt) {
+function applyTheme(key, x, y) {
   document.cookie = `jm_theme=${key}; path=/; max-age=31536000; samesite=lax`;
+  const root = document.documentElement;
   const swap = () => {
-    document.documentElement.dataset.theme = key;
-    document.querySelectorAll("[data-set-theme]").forEach((o) => o.setAttribute("aria-checked", o.dataset.setTheme === key));
-    document.querySelectorAll(".theme-btn").forEach((b) => {
-      const chips = opt.querySelectorAll(".chips i");
-      b.querySelectorAll(".dots i").forEach((d, i) => (d.style.background = chips[i]?.style.background));
-      const lbl = b.querySelector(".lbl"); if (lbl) lbl.textContent = opt.querySelector(".tname").firstChild.textContent.trim();
+    root.dataset.theme = key;
+    const dark = key === "noche";
+    document.querySelectorAll("[data-theme-toggle]").forEach((b) => {
+      b.setAttribute("aria-pressed", dark);
+      b.title = dark ? "Cambiar a tema claro" : "Cambiar a tema oscuro";
     });
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue("--frame").trim();
+    if (meta) meta.content = getComputedStyle(root).getPropertyValue("--frame").trim();
     window.dispatchEvent(new CustomEvent("themechange", { detail: key }));
   };
-  if (document.startViewTransition && !reduceMotion) document.startViewTransition(swap);
-  else swap();
+  if (!document.startViewTransition || reduceMotion) return swap();
+  // radio hasta la esquina más lejana, para que el círculo cubra toda la pantalla
+  const rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  root.style.setProperty("--tx", x + "px"); root.style.setProperty("--ty", y + "px"); root.style.setProperty("--tr", rad + "px");
+  root.classList.add("vt-theme");  // toda la página como una sola capa, sin piezas con nombre
+  const vt = document.startViewTransition(swap);
+  vt.finished.finally(() => root.classList.remove("vt-theme"));
 }
 // Lee un color del tema actual (para Chart.js y Three.js)
 window.themeColor = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -186,21 +185,64 @@ window.themeColor = (name) => getComputedStyle(document.documentElement).getProp
 function initDock() {
   const dock = document.querySelector("[data-dock]");
   if (!dock || reduceMotion || !matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)").matches) return;
-  const tiles = [...dock.querySelectorAll(".dock-item .tile")];
-  const RANGE = 120, MAX = 0.32;
-  let raf = 0, y = null;
-  const update = () => {
-    raf = 0;
-    tiles.forEach((t) => {
-      if (y === null) { t.style.setProperty("--mag", 1); return; }
-      const r = t.getBoundingClientRect();
-      const d = Math.abs(y - (r.top + r.height / 2));
-      const k = Math.max(0, 1 - d / RANGE);
-      t.style.setProperty("--mag", (1 + MAX * k * k).toFixed(3));
-    });
+  // FloatingDock: el tamaño de cada ícono sale de su distancia horizontal al cursor
+  // (−150 px → 40, 0 → 80, +150 px → 40) y lo sigue un resorte (masa 0.1, rigidez 150, amortiguación 12)
+  const tiles = [...dock.querySelectorAll(".dock-item .tile")].map((el) => ({ el, x: 40, v: 0 }));
+  const MIN = 40, MAX = 80, RANGE = 150, MASS = 0.1, K = 150, DAMP = 12;
+  let raf = 0, mouseX = Infinity, last = 0;
+  const step = (now) => {
+    const dt = Math.min(0.032, (now - (last || now)) / 1000 || 0.016);
+    last = now;
+    let moving = false;
+    for (const t of tiles) {
+      const r = t.el.getBoundingClientRect();            // límites vivos: los vecinos se apartan al crecer
+      const d = mouseX - r.left - r.width / 2;
+      const goal = MIN + (MAX - MIN) * Math.max(0, 1 - Math.abs(d) / RANGE);
+      // integración semiimplícita en 2 subpasos (estable con rigidez alta)
+      for (let i = 0; i < 2; i++) {
+        const a = (-K * (t.x - goal) - DAMP * t.v) / MASS;
+        t.v += a * (dt / 2);
+        t.x += t.v * (dt / 2);
+      }
+      if (Math.abs(t.x - goal) > 0.05 || Math.abs(t.v) > 0.5) moving = true;
+      else { t.x = goal; t.v = 0; }
+      t.el.style.setProperty("--size", `${t.x.toFixed(2)}px`);
+    }
+    raf = moving ? requestAnimationFrame(step) : 0;
+    if (!moving) last = 0;
   };
-  dock.addEventListener("mousemove", (e) => { y = e.clientY; if (!raf) raf = requestAnimationFrame(update); });
-  dock.addEventListener("mouseleave", () => { y = null; if (!raf) raf = requestAnimationFrame(update); });
+  const kick = () => { if (!raf) raf = requestAnimationFrame(step); };
+  dock.addEventListener("mousemove", (e) => { mouseX = e.clientX; kick(); });
+  dock.addEventListener("mouseleave", () => { mouseX = Infinity; kick(); });
+
+  // globos: el primero espera un instante; ya abierto uno, los vecinos salen al momento
+  let cool = 0;
+  dock.querySelectorAll(".dock-item").forEach((it) => it.addEventListener("mouseenter", () => {
+    clearTimeout(cool);
+    if (!dock.classList.contains("tips-warm")) cool = setTimeout(() => dock.classList.add("tips-warm"), 300);
+  }));
+  dock.addEventListener("mouseleave", () => { clearTimeout(cool); cool = setTimeout(() => dock.classList.remove("tips-warm"), 400); });
+}
+
+// ---- Entradas escalonadas: cada bloque entra al aparecer en pantalla, con su propio movimiento ----
+function initReveal() {
+  const blocks = [...document.querySelectorAll("[data-rv]")];
+  if (!blocks.length || reduceMotion || !("IntersectionObserver" in window)) return;
+  // el inicio se abre muchas veces al día: la entrada completa solo la primera vez de la sesión
+  const key = "jm_rv_" + location.pathname;
+  try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch (e) {}
+  document.documentElement.classList.add("rv-on");
+  blocks.forEach((b) => b.classList.add("rv-wait"));
+  const io = new IntersectionObserver((entries) => {
+    // lo que entra en el mismo cuadro se escalona en orden de lectura
+    entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top || a.boundingClientRect.left - b.boundingClientRect.left)
+      .forEach((e, i) => {
+        e.target.style.setProperty("--rv-d", `${i * 90}ms`);
+        e.target.classList.replace("rv-wait", "rv-go");
+        io.unobserve(e.target);
+      });
+  }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+  (window.jmAfterEnter || ((f) => f()))(() => blocks.forEach((b) => io.observe(b)));
 }
 
 // ---- Móvil: hoja "Más" con las secciones que no caben en la barra ----
@@ -384,4 +426,4 @@ document.addEventListener("click", (e) => {
   if (a) setTimeout(() => document.querySelector(a.dataset.scroll)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
 });
 
-document.addEventListener("DOMContentLoaded", () => { initToasts(); initTabs(); initOdontogram(); initCounters(); initThemePicker(); initDock(); initSignature(); initCharge(); initBuy(); initPhoto(); });
+document.addEventListener("DOMContentLoaded", () => { initToasts(); initTabs(); initOdontogram(); initCounters(); initThemePicker(); initDock(); initReveal(); initSignature(); initCharge(); initBuy(); initPhoto(); });

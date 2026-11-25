@@ -7,7 +7,7 @@
     <div class="card card-pad" id="perfil">
       <h2 style="margin-bottom:12px">Mi perfil</h2>
       <form method="post" action="/configuracion/foto" class="photo-row" data-photo>
-        <span class="photo-wrap">{{ avatar(user.initials, user.color, 'avatar-xl', user.photo) }}</span>
+        <span class="photo-wrap">{{ avatar(user.initials, user.color, 'avatar-xl', user.avatar_src) }}</span>
         <div>
           <b>{{ user.full_name }}</b><div class="muted">{{ user.specialty }} · usuario «{{ user.username }}»</div>
           <div class="row wrap mt" style="gap:8px">
@@ -20,6 +20,9 @@
       <form method="post" action="/configuracion/perfil" class="mt">
         <div class="form-grid">
           <div class="field"><label>Teléfono</label><input type="tel" name="phone" value="{{ user.phone }}"></div>
+          <div class="field"><label>Cédula profesional</label><input type="text" name="cedula" maxlength="20" value="{{ user.cedula }}" placeholder="Aparece en notas y consentimientos"></div>
+          <div class="field"><label>Cédula de especialidad</label><input type="text" name="cedula_especialidad" maxlength="20" value="{{ user.cedula_especialidad }}"></div>
+          <div class="field span-2"><label>Institución que expidió el título</label><input type="text" name="universidad" maxlength="120" value="{{ user.universidad }}"></div>
           <div class="field"><label>Color en la agenda</label><input type="color" name="color" value="{{ user.color }}" style="height:38px;width:100%;border:1px solid var(--control);border-radius:9px"></div>
         </div>
         <button class="btn btn-primary">Guardar perfil</button>
@@ -30,8 +33,8 @@
       <h2 style="margin-bottom:6px">{{ icon('lock') }} Cambiar contraseña</h2>
       <div class="field"><label>Contraseña actual</label><input type="password" name="current" required autocomplete="current-password"></div>
       <div class="form-grid">
-        <div class="field"><label>Nueva contraseña (mín. 6)</label><input type="password" name="new" required minlength="6" autocomplete="new-password"></div>
-        <div class="field"><label>Repite la nueva</label><input type="password" name="confirm" required minlength="6" autocomplete="new-password"></div>
+        <div class="field"><label>Nueva contraseña (mín. 10)</label><input type="password" name="new" required minlength="10" autocomplete="new-password"></div>
+        <div class="field"><label>Repite la nueva</label><input type="password" name="confirm" required minlength="10" autocomplete="new-password"></div>
       </div>
       <label class="check mb"><input type="checkbox" data-show-pass> Mostrar contraseñas</label>
       <button class="btn btn-primary">{{ icon('lock') }} Actualizar contraseña</button>

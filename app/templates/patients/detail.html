@@ -5,7 +5,7 @@
 {% include "patients/_charge.html" %}
 <div class="card mb">
   <div class="p-head">
-    <span style="display:inline-block;view-transition-name: pav-{{ p.id }}">{{ avatar(p.initials, p.primary_doctor.color if p.primary_doctor else '#64748b', 'avatar-lg') }}</span>
+    <span style="display:inline-block;view-transition-name: pav-{{ p.id }}">{{ avatar(p.initials, p.primary_doctor.color if p.primary_doctor else '#64748b', 'avatar-lg', p.avatar_src) }}</span>
     <div class="grow">
       <div class="row wrap" style="gap:8px"><h1 style="view-transition-name: pname-{{ p.id }}">{{ p.full_name }}</h1>
         {% for f in h.alert_flags %}<span class="pill pill-bad">{{ icon('alert') }} {{ f }}</span>{% endfor %}
@@ -13,7 +13,8 @@
       </div>
       <div class="p-facts">
         <span><b>{{ p.age if p.age is not none else '—' }}</b> años</span>
-        <span>{{ p.sex or 'Sexo no indicado' }}</span>
+        <span>{{ p.sex }}</span>
+        {% if p.curp %}<span>CURP <b>{{ p.curp }}</b></span>{% endif %}
         <span>{{ icon('message') }} {{ p.phone or 'Sin teléfono' }}</span>
         <span>Expediente <b>#{{ '%05d'|format(p.id) }}</b></span>
         <span>Tratante: <b>{{ p.primary_doctor.short_name if p.primary_doctor else '—' }}</b></span>
@@ -30,7 +31,6 @@
     </div>
   </div>
   <div class="card-body row wrap" style="border-top:1px solid var(--line);gap:8px">
-    <a class="btn btn-sm" href="/citas/nueva?paciente={{ p.id }}">{{ icon('calendar') }} Agendar cita</a>
     {% if p.phone %}<a class="btn btn-sm btn-wa" href="{{ wa(p.phone, 'Hola ' ~ p.first_name ~ ', te saludamos del Consultorio Dental JM.') }}" target="_blank" rel="noopener">{{ icon('message') }} WhatsApp</a>{% endif %}
     <a class="btn btn-sm" href="/pacientes/{{ p.id }}/historia/imprimir" target="_blank">{{ icon('printer') }} Imprimir historia clínica</a>
     <a class="btn btn-sm" href="/pacientes/{{ p.id }}/editar">{{ icon('edit') }} Editar ficha</a>
@@ -174,7 +174,7 @@
         <div class="field"><label>Personales no patológicos (hábitos, higiene)</label><textarea name="antecedentes_no_patologicos">{{ h.antecedentes_no_patologicos }}</textarea></div>
         <div class="field"><label>Alergias</label><textarea name="alergias" placeholder="Medicamentos, látex, anestésicos…">{{ h.alergias }}</textarea></div>
         <div class="field"><label>Medicamentos actuales</label><input type="text" name="medicamentos" value="{{ h.medicamentos }}"></div>
-        <div class="field"><label>Presión arterial</label><input type="text" name="presion_arterial" value="{{ h.presion_arterial }}" placeholder="120/80"></div>
+        <div class="field"><label>Grupo sanguíneo y Rh</label><select name="grupo_sanguineo">{% for o in cfg.GRUPOS_SANGUINEOS %}<option {{ 'selected' if h.grupo_sanguineo == o }}>{{ o }}</option>{% endfor %}</select></div>
       </div>
       <div class="checks">
         {% for k, l in [('diabetes','Diabetes'),('hipertension','Hipertensión'),('cardiopatia','Cardiopatía'),('coagulacion','Trastorno de coagulación'),('embarazo','Embarazo'),('fumador','Fumador(a)'),('bruxismo','Bruxismo')] %}
@@ -184,12 +184,35 @@
     </fieldset>
     <hr class="section-sep">
     <fieldset>
-      <legend>Exploración</legend>
+      <legend>Interrogatorio por aparatos y sistemas</legend>
+      {% set ap = h.aparatos %}
       <div class="form-grid">
-        <div class="field"><label>Extraoral (cara, ATM, ganglios)</label><textarea name="exploracion_extraoral">{{ h.exploracion_extraoral }}</textarea></div>
+        {% for key, label in cfg.APARATOS %}<div class="field"><label>{{ label }}</label><input type="text" name="ap_{{ key }}" maxlength="500" value="{{ ap.get(key, '') }}" placeholder="Niega / síntomas referidos"></div>{% endfor %}
+      </div>
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
+      <legend>Exploración física y signos vitales</legend>
+      <div class="form-grid">
+        <div class="field span-2"><label>Habitus exterior</label><textarea name="habitus_exterior" placeholder="Edad aparente, constitución, facies, actitud, marcha…">{{ h.habitus_exterior }}</textarea></div>
+        <div class="field"><label>Tensión arterial (mmHg)</label><input type="text" name="presion_arterial" maxlength="20" value="{{ h.presion_arterial }}" placeholder="120/80"></div>
+        <div class="field"><label>Frecuencia cardiaca (lpm)</label><input type="text" name="frecuencia_cardiaca" maxlength="12" value="{{ h.frecuencia_cardiaca }}"></div>
+        <div class="field"><label>Frecuencia respiratoria (rpm)</label><input type="text" name="frecuencia_respiratoria" maxlength="12" value="{{ h.frecuencia_respiratoria }}"></div>
+        <div class="field"><label>Temperatura (°C)</label><input type="text" name="temperatura" maxlength="12" value="{{ h.temperatura }}"></div>
+        <div class="field"><label>Peso (kg)</label><input type="text" name="peso" maxlength="12" value="{{ h.peso }}"></div>
+        <div class="field"><label>Talla (cm)</label><input type="text" name="talla" maxlength="12" value="{{ h.talla }}"></div>
+      </div>
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
+      <legend>Exploración de cabeza, cuello y boca</legend>
+      <div class="form-grid">
+        <div class="field"><label>Extraoral (cara, cuello, ganglios)</label><textarea name="exploracion_extraoral">{{ h.exploracion_extraoral }}</textarea></div>
+        <div class="field"><label>Articulación temporomandibular (ATM)</label><textarea name="exploracion_atm" placeholder="Ruidos, dolor, apertura, desviación…">{{ h.exploracion_atm }}</textarea></div>
         <div class="field"><label>Intraoral (mucosas, encía, lengua)</label><textarea name="exploracion_intraoral">{{ h.exploracion_intraoral }}</textarea></div>
         <div class="field"><label>Higiene oral</label><select name="higiene_oral">{% for o in ['', 'Buena', 'Regular', 'Mala'] %}<option {{ 'selected' if h.higiene_oral == o }}>{{ o }}</option>{% endfor %}</select></div>
-        <div class="field"><label>Oclusión</label><input type="text" name="oclusion" value="{{ h.oclusion }}" placeholder="Clase I / II / III, mordida…"></div>
+        <div class="field"><label>Oclusión</label><input type="text" name="oclusion" maxlength="120" value="{{ h.oclusion }}" placeholder="Clase I / II / III, mordida…"></div>
+        <div class="field"><label>Índice de placa (O'Leary, %)</label><input type="text" name="indice_placa" maxlength="60" value="{{ h.indice_placa }}" placeholder="Ej. 35 %"></div>
       </div>
     </fieldset>
     <hr class="section-sep">
@@ -215,18 +238,24 @@
       
       <input type="hidden" name="odontograma_json" id="odontograma_json" value="{{ h.odontograma_json }}">
       {% with readonly=False %}{% include "patients/_odontogram.html" %}{% endwith %}
+      {% set cp = h.cpod %}<p class="muted" style="margin:10px 0 0">Índice CPOD (calculado del odontograma): <b>{{ cp.total }}</b> · Cariados {{ cp.c }} · Perdidos {{ cp.p }} · Obturados {{ cp.o }}</p>
     </fieldset>
     <hr class="section-sep">
     <fieldset>
-      <legend>Diagnóstico y plan</legend>
+      <legend>Resultados de estudios de laboratorio y gabinete</legend>
+      <div class="field"><label>Radiografías, tomografía, biometría, etc. (fecha y hallazgos)</label><textarea name="estudios_complementarios">{{ h.estudios_complementarios }}</textarea></div>
+    </fieldset>
+    <hr class="section-sep">
+    <fieldset>
+      <legend>Diagnóstico, pronóstico e indicación terapéutica</legend>
       <div class="form-grid">
         <div class="field"><label>Diagnóstico</label><textarea name="diagnostico">{{ h.diagnostico }}</textarea></div>
-        <div class="field"><label>Plan de tratamiento</label><textarea name="plan_tratamiento">{{ h.plan_tratamiento }}</textarea></div>
+        <div class="field"><label>Plan de tratamiento e indicación terapéutica</label><textarea name="plan_tratamiento">{{ h.plan_tratamiento }}</textarea></div>
         <div class="field"><label>Pronóstico</label><select name="pronostico">{% for o in ['', 'Favorable', 'Reservado', 'Desfavorable'] %}<option {{ 'selected' if h.pronostico == o }}>{{ o }}</option>{% endfor %}</select></div>
       </div>
       <div class="checks">
         <span class="check" style="cursor:default">{{ icon('check' if h.consentimiento_firmado else 'alert') }} Consentimiento informado: {{ 'firmado' if h.consentimiento_firmado else 'pendiente (fírmalo abajo)' }}</span>
-        <label class="check"><input type="checkbox" name="aviso_privacidad" {{ 'checked' if h.aviso_privacidad }}> Aviso de privacidad aceptado</label>
+        <label class="check"><input type="checkbox" name="aviso_privacidad" {{ 'checked' if h.aviso_privacidad }}> Aviso de privacidad entregado y aceptado{% if h.aviso_privacidad_fecha %} ({{ h.aviso_privacidad_fecha|fecha }}){% endif %}</label>
       </div>
     </fieldset>
     <div class="actions"><button class="btn btn-primary">Guardar historia clínica</button>
@@ -234,23 +263,38 @@
   </form>
 
   <div class="card card-pad mt" id="consentimiento">
-    <div class="card-head" style="padding:0 0 12px"><h2>{{ icon('edit') }} Consentimiento informado</h2>
+    <div class="card-head" style="padding:0 0 12px"><h2>{{ icon('edit') }} Carta de consentimiento informado</h2>
       {% if h.consentimiento_firma %}<span class="pill pill-ok">Firmado</span>{% elif h.consentimiento_firmado %}<span class="pill pill-ok">Firmado en papel</span>{% else %}<span class="pill pill-warn">Pendiente</span>{% endif %}</div>
-    <p class="consent-text">Declaro que el/la Dr(a). {{ p.primary_doctor.full_name if p.primary_doctor else 'tratante' }} me explicó en términos claros
-      el diagnóstico, el plan de tratamiento, sus alternativas, riesgos y costos; que pude hacer preguntas y que autorizo
-      la atención odontológica descrita en este expediente (NOM-004-SSA3-2012).</p>
+    <p class="consent-text">{{ cfg.CLINIC_NAME }}{% if cfg.CLINIC_ADDRESS %}, {{ cfg.CLINIC_ADDRESS }}{% endif %}. Declaro que el/la Dr(a). {{ p.primary_doctor.full_name if p.primary_doctor else 'tratante' }} me explicó en términos claros
+      el diagnóstico, el plan de tratamiento, sus alternativas, riesgos, beneficios y costos; que pude hacer preguntas y que autorizo
+      la atención odontológica descrita, así como los procedimientos necesarios ante una contingencia o urgencia derivada del acto médico (NOM-004-SSA3-2012, 10.1).</p>
     {% if h.consentimiento_firma %}
+      <dl class="consent-data">
+        <dt>Acto médico autorizado</dt><dd>{{ h.consentimiento_acto or '—' }}</dd>
+        <dt>Riesgos y beneficios</dt><dd>{{ h.consentimiento_riesgos or '—' }}</dd>
+        <dt>Testigos</dt><dd>{{ h.consentimiento_testigo1 or '—' }}{% if h.consentimiento_testigo2 %} · {{ h.consentimiento_testigo2 }}{% endif %}</dd>
+      </dl>
       <figure class="sig-done">
         <img src="{{ h.consentimiento_firma }}" alt="Firma de {{ h.consentimiento_nombre }}">
-        <figcaption><b>{{ h.consentimiento_nombre }}</b>{% if h.consentimiento_fecha %} · {{ h.consentimiento_fecha|fecha('fechahora') }}{% endif %}</figcaption>
+        <figcaption><b>{{ h.consentimiento_nombre }}</b> ({{ h.consentimiento_calidad or 'Paciente' }}){% if h.consentimiento_fecha %} · {{ cfg.CLINIC_CITY }}, {{ h.consentimiento_fecha|fecha('fechahora') }}{% endif %}</figcaption>
       </figure>
-      <form method="post" action="/pacientes/{{ p.id }}/consentimiento/eliminar" class="inline-form" data-confirm="¿Eliminar la firma para que el paciente firme de nuevo?">
+      <div class="row wrap" style="gap:8px">
+        <a class="btn btn-sm" href="/pacientes/{{ p.id }}/consentimiento/imprimir" target="_blank">{{ icon('printer') }} Imprimir consentimiento (con testigos)</a>
+        <form method="post" action="/pacientes/{{ p.id }}/consentimiento/eliminar" class="inline-form" data-confirm="¿Eliminar la firma para que el paciente firme de nuevo? Quedará registrado en la bitácora.">
         <button class="btn btn-sm btn-ghost btn-danger">{{ icon('x') }} Borrar firma y volver a firmar</button></form>
+      </div>
     {% else %}
       {% if h.consentimiento_firmado %}<p class="muted" style="margin:-4px 0 12px">Firmado en papel.</p>{% endif %}
       <form method="post" action="/pacientes/{{ p.id }}/consentimiento" data-signature>
-        <div class="field"><label>Nombre de quien firma (paciente o tutor)</label>
-          <input type="text" name="nombre" value="{{ p.full_name }}" required maxlength="160"></div>
+        <div class="form-grid">
+          <div class="field span-2"><label>Acto médico que se autoriza *</label><textarea name="acto" required maxlength="5000" placeholder="Procedimiento(s) a realizar">{{ h.plan_tratamiento }}</textarea></div>
+          <div class="field span-2"><label>Riesgos y beneficios explicados *</label><textarea name="riesgos" required maxlength="5000" placeholder="Riesgos, complicaciones posibles y beneficios esperados"></textarea></div>
+          <div class="field"><label>Nombre de quien firma *</label>
+            <input type="text" name="nombre" value="{{ p.full_name }}" required maxlength="160"></div>
+          <div class="field"><label>En calidad de</label><select name="calidad">{% for c in cfg.CALIDADES_CONSENTIMIENTO %}<option>{{ c }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Testigo 1 (nombre completo)</label><input type="text" name="testigo1" maxlength="160"></div>
+          <div class="field"><label>Testigo 2 (nombre completo)</label><input type="text" name="testigo2" maxlength="160"></div>
+        </div>
         <div class="sig-pad">
           <canvas aria-label="Recuadro para firmar con el dedo o el mouse"></canvas>
           <span class="sig-line">Firme aquí</span>
@@ -263,6 +307,14 @@
       </form>
     {% endif %}
   </div>
+
+  <div class="card mt" id="bitacora">
+    <div class="card-head"><h2>{{ icon('lock') }} Bitácora del expediente</h2><small class="muted">Se conserva al menos {{ cfg.RETENTION_YEARS }} años (NOM-004-SSA3-2012)</small></div>
+    {% if trail %}<div class="table-wrap"><table class="table">
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead>
+      <tbody>{% for e in trail %}<tr><td class="tnum">{{ e.at|fecha('fechahora') }}</td><td>{{ e.user.short_name if e.user else '—' }}</td><td>{{ e.action }}</td><td class="muted">{{ e.detail }}</td></tr>{% endfor %}</tbody>
+    </table></div>{% else %}<div class="empty">Sin movimientos registrados.</div>{% endif %}
+  </div>
 </section>
 
 {# ---------------- EVOLUCIÓN ---------------- #}
@@ -273,9 +325,13 @@
       <ul class="timeline">
         {% for n in p.notes_list %}
         <li>
-          <div class="row between wrap"><b>{{ n.procedure or 'Nota' }}</b><small class="muted">{{ n.date|fecha('fechahora') }} · {{ n.doctor.short_name }}</small></div>
+          <div class="row between wrap"><b>{{ n.procedure or 'Nota' }}{% if n.kind and n.kind != 'Evolución' %} <span class="pill pill-brand">{{ n.kind }}</span>{% endif %}</b><small class="muted">{{ n.date|fecha('fechahora') }} · {{ n.doctor.full_name }}{% if n.doctor.cedula %} · Céd. prof. {{ n.doctor.cedula }}{% endif %}</small></div>
           {% if n.teeth %}<small class="muted">Piezas: {{ n.teeth }}</small>{% endif %}
+          {% if n.vitals %}<div><small class="muted">Signos vitales: {{ n.vitals }}</small></div>{% endif %}
           <p style="margin:4px 0">{{ n.note }}</p>
+          {% if n.diagnosis %}<div><small><b>Diagnóstico:</b> {{ n.diagnosis }}</small></div>{% endif %}
+          {% if n.studies %}<div><small><b>Estudios:</b> {{ n.studies }}</small></div>{% endif %}
+          {% if n.indications %}<div><small><b>Indicaciones / tratamiento:</b> {{ n.indications }}</small></div>{% endif %}
           {% if n.next_step %}<small class="pill pill-brand">Siguiente: {{ n.next_step }}</small>{% endif %}
         </li>
         {% endfor %}
@@ -283,11 +339,17 @@
       {% else %}<div class="empty">Aún no hay notas de evolución.</div>{% endif %}
     </div>
     <form method="post" action="/pacientes/{{ p.id }}/notas" class="card card-pad">
-      <h2 style="margin-bottom:12px">Nueva nota de evolución</h2>
+      <h2 style="margin-bottom:12px">Nueva nota</h2>
+      <div class="field"><label>Tipo de nota</label><select name="kind">{% for k in cfg.NOTE_KINDS %}<option>{{ k }}</option>{% endfor %}</select></div>
       <div class="field"><label>Procedimiento</label><input type="text" name="procedure" placeholder="Ej. Cambio de arco, resina clase IV…"></div>
       <div class="field"><label>Piezas dentales</label><input type="text" name="teeth" placeholder="Ej. 11, 21"></div>
-      <div class="field"><label>Nota</label><textarea name="note" required></textarea></div>
+      <div class="field"><label>Signos vitales</label><input type="text" name="vitals" maxlength="160" placeholder="TA 120/80, FC 72, Temp 36.5"></div>
+      <div class="field"><label>Evolución y actualización del cuadro clínico</label><textarea name="note" required></textarea></div>
+      <div class="field"><label>Diagnóstico</label><input type="text" name="diagnosis" maxlength="255"></div>
+      <div class="field"><label>Resultados de estudios</label><textarea name="studies" placeholder="Radiografías, laboratorio…"></textarea></div>
+      <div class="field"><label>Tratamiento e indicaciones</label><textarea name="indications" placeholder="Medicamento, dosis, vía y periodicidad; cuidados"></textarea></div>
       <div class="field"><label>Siguiente paso</label><input type="text" name="next_step" placeholder="Ej. Control en 4 semanas"></div>
+      <p class="muted" style="font-size:.85em">Se firma con tu nombre y cédula y no se puede editar: para corregir agrega una nota aclaratoria.</p>
       <button class="btn btn-primary">Agregar nota</button>
     </form>
   </div>
@@ -340,10 +402,10 @@
               <button type="button" class="btn" data-charge-open data-tid="{{ t.id }}">{{ icon('wallet') }} Abonar</button>
             </div>
             {% endif %}
-            <form method="post" action="/tratamientos/{{ t.id }}" class="row" style="gap:6px;align-items:flex-end">
+            {% if t.doctor_id == user.id %}<form method="post" action="/tratamientos/{{ t.id }}" class="row" style="gap:6px;align-items:flex-end">
               <div><label>Estado</label><select name="status" onchange="this.form.submit()">{% for s in ['presupuesto','en proceso','terminado','cancelado'] %}<option {{ 'selected' if t.status == s }}>{{ s }}</option>{% endfor %}</select></div>
               <div style="width:90px"><label>Sesiones</label><input type="number" name="sessions_done" min="0" value="{{ t.sessions_done }}" onchange="this.form.submit()"></div>
-            </form>
+            </form>{% endif %}
             {% if t.doctor_id == user.id %}<a class="btn btn-sm" href="/tratamientos/{{ t.id }}/presupuesto" target="_blank">{{ icon('file') }} Presupuesto</a>{% endif %}
           </div>
         </div>
@@ -415,4 +477,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script type="module" src="/static/js/typodont3d.js?v=5"></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/typodont3d.js?v=10"></script>{% endblock %}

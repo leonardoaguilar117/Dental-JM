@@ -68,7 +68,7 @@
     <div class="card">
       <div class="card-head"><h2>Paciente</h2><a class="btn btn-xs btn-ghost" href="/pacientes/{{ a.patient_id }}">Expediente</a></div>
       <div class="card-body">
-        <div class="row">{{ avatar(a.patient.initials, a.doctor.color) }}<div><b>{{ a.patient.full_name }}</b><div class="muted">{{ a.patient.phone }} · {{ a.patient.age }} años</div></div></div>
+        <div class="row">{{ avatar(a.patient.initials, a.doctor.color, '', a.patient.avatar_src) }}<div><b>{{ a.patient.full_name }}</b><div class="muted">{{ a.patient.phone }} · {{ a.patient.age }} años</div></div></div>
         {% if a.patient.history and a.patient.history.alert_flags %}
         <div class="alert-box alert-bad mt">{{ icon('alert') }}<span>{{ a.patient.history.alert_flags|join(' · ') }}</span></div>{% endif %}
         {% set mybal = a.patient.balance_for(user.id) %}<div class="debt-box mt {{ 'owes' if mybal > 0 else 'clear' }}">

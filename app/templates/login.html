@@ -1,51 +1,103 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon, avatar, theme_picker %}
+{% from "_icons.html" import icon, theme_picker, logo %}
 {% block title %}Iniciar sesión{% endblock %}
+{% block flashes %}{% endblock %}{# en el login el aviso va dentro del formulario #}
 {% block public %}
-<div class="login-theme">{{ theme_picker(theme|default('lavanda')) }}</div>
-<div class="login-wrap">
-  <section class="login-art">
-    <div class="login-brand">
-      <span class="dock-mark" style="margin:0">{{ icon('tooth') }}</span>
-      <span><b>Consultorio Dental JM</b><span>Ortodoncia · Estética dental</span></span>
-    </div>
-    <div>
-      <h1>Cada sonrisa, con su historia completa.</h1>
-    </div>
-    <small class="art-extra">Demo ilustrativo · datos ficticios</small>
-  </section>
-  <section class="login-form">
+<div class="login">
+  <section class="login-main">
+    <header class="login-top">
+      <a class="login-brand" href="/login">
+        <span class="dock-mark">{{ logo() }}</span>
+        <span><b>Consultorio Dental JM</b><small>Ortodoncia · Estética dental</small></span>
+      </a>
+      {{ theme_picker(theme|default('lavanda')) }}
+    </header>
+
     <div class="login-card">
-      <h2 style="font-size:22px;line-height:28px;margin-bottom:4px">Entrar</h2>
-      <div style="margin-bottom:16px"></div>
-      <form method="post" action="/login">
-        <div class="doctor-pick" role="radiogroup" aria-label="Usuario">
-          {% for d in doctors %}
-          <button type="button" role="radio" aria-checked="{{ 'true' if loop.first else 'false' }}" data-user="{{ d.username }}" class="{{ 'active' if loop.first }}">
-            {{ avatar(d.initials, d.color, '', d.photo) }}
-            <div><b>{{ d.full_name }}</b><span>{{ d.specialty }}{% if d.can_inventory %} · Depósito dental{% endif %}</span></div>
-            <span class="tick">{{ icon('check') }}</span>
-          </button>
-          {% endfor %}
+      <h1>Entrar al consultorio</h1>
+      <p class="lead">Escribe tu usuario y contraseña.</p>
+
+      {% set err = flashes|selectattr('k', 'equalto', 'error')|list %}
+      {% for f in flashes %}
+      <p class="login-alert {{ 'is-error' if f.k == 'error' }}" role="{{ 'alert' if f.k == 'error' else 'status' }}">{{ icon('alert' if f.k == 'error' else 'check') }}<span>{{ f.m }}</span></p>
+      {% endfor %}
+      <form method="post" action="/login" data-login>
+        <div class="field">
+          <label for="username">Usuario</label>
+          <input type="text" id="username" name="username" value="{{ last_user }}" required maxlength="50"
+                 autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" {{ 'autofocus' if not last_user }}
+                 {% if err %}aria-invalid="true" {% endif %}>
         </div>
-        <input type="hidden" name="username" id="username" value="{{ doctors[0].username if doctors else '' }}">
+
         <div class="field">
           <label for="password">Contraseña</label>
-          <input type="password" id="password" name="password" required autofocus autocomplete="current-password">
-          <div class="hint">Demo: la contraseña de ambos usuarios es <b>demo123</b></div>
+          <div class="pw">
+            <input type="password" id="password" name="password" required maxlength="200" {{ 'autofocus' if last_user }}
+                   autocomplete="current-password" {% if err %}aria-invalid="true" {% endif %}aria-describedby="caps{% if demo_hint %} demo{% endif %}">
+            <button type="button" class="pw-toggle" data-pw-toggle aria-controls="password" aria-pressed="false" aria-label="Mostrar contraseña">
+              <span class="on">{{ icon('eye') }}</span><span class="off">{{ icon('eye-off') }}</span>
+            </button>
+          </div>
+          <p class="caps" id="caps" role="status" hidden>{{ icon('alert') }} Bloq Mayús está activado.</p>
+          {% if demo_hint %}<p class="hint" id="demo">Demo local: usuario <b>jimena</b> o <b>carlos</b>, contraseña <b>demo123</b>.</p>{% endif %}
         </div>
-        <button class="btn btn-primary" style="width:100%;height:44px;font-size:14.5px">Entrar al consultorio {{ icon('arrow-right') }}</button>
+
+        <button class="btn btn-primary login-submit" data-submit>
+          <span class="idle">Entrar {{ icon('arrow-right') }}</span>
+          <span class="busy" aria-hidden="true"><i class="spin"></i>Entrando…</span>
+        </button>
       </form>
     </div>
+
+    <footer class="login-foot">Demo ilustrativo · datos ficticios</footer>
   </section>
+
+  <aside class="login-art" aria-hidden="true">
+    <img src="/static/img/diente.jpg" alt="" width="384" height="672" decoding="async" fetchpriority="high">
+    <p>Cada sonrisa,<br>con su historia completa.</p>
+  </aside>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
-document.querySelectorAll(".doctor-pick button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll(".doctor-pick button").forEach(x => { const on = x === b; x.classList.toggle("active", on); x.setAttribute("aria-checked", on); });
-  document.getElementById("username").value = b.dataset.user;
-  document.getElementById("password").focus();
-}));
+(() => {
+  try { sessionStorage.removeItem("jm_entering"); } catch (e) {}  // un intento fallido no deja la marca puesta
+  const user = document.getElementById("username");
+  const pw = document.getElementById("password");
+  // recuerda el usuario que entró la última vez en este equipo
+  if (!user.value) {
+    let last = null; try { last = localStorage.getItem("jm_last_user"); } catch (e) {}
+    if (last) { user.value = last; pw.focus(); }
+  }
+
+  const toggle = document.querySelector("[data-pw-toggle]");
+  toggle.addEventListener("click", () => {
+    const show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    toggle.setAttribute("aria-pressed", show);
+    toggle.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
+    pw.focus();
+  });
+
+  const caps = document.getElementById("caps");
+  const checkCaps = (e) => { if (e.getModifierState) caps.hidden = !e.getModifierState("CapsLock"); };
+  pw.addEventListener("keydown", checkCaps);
+  pw.addEventListener("keyup", checkCaps);
+  pw.addEventListener("blur", () => { caps.hidden = true; });
+
+  const form = document.querySelector("[data-login]");
+  form.addEventListener("submit", () => {
+    try { localStorage.setItem("jm_last_user", user.value.trim().toLowerCase()); } catch (e) {}
+    try { sessionStorage.setItem("jm_entering", "1"); } catch (e) {}  // la pantalla siguiente anima la entrada
+    const btn = form.querySelector("[data-submit]");
+    btn.classList.add("loading"); btn.setAttribute("aria-busy", "true");
+    setTimeout(() => { btn.disabled = true; }, 0);  // después de enviar, para no cancelar el envío
+  });
+  // al volver con "atrás" el navegador restaura la página tal cual: el botón vuelve a estar listo
+  window.addEventListener("pageshow", () => {
+    const btn = form.querySelector("[data-submit]");
+    btn.classList.remove("loading"); btn.removeAttribute("aria-busy"); btn.disabled = false;
+  });
+})();
 </script>
 {% endblock %}

@@ -11,6 +11,11 @@ services:
     envVars:
       - key: SECRET_KEY
         generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      # Contraseña inicial de jimena y carlos (si no se define, se genera una y se imprime en el log del primer arranque)
+      - key: DEMO_PASSWORD
+        sync: false
       - key: SEED_DEMO
         value: "true"
       - key: TZ_CONSULTORIO
