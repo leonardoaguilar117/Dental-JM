@@ -45,18 +45,24 @@ docker run -p 8000:8000 -e SECRET_KEY=algo-secreto consultorio-jm
 
 ## Render
 
-**Opción A, servicio nuevo con Blueprint (recomendada):** en Render, **New → Blueprint**, elige el repositorio y Render crea, con `render.yaml`, el servicio Docker (rama `main`, despliegue automático), la base PostgreSQL y una `SECRET_KEY` aleatoria. Solo te pedirá `DEMO_PASSWORD`.
+La base de datos (SQLite) vive dentro del contenedor, en un **disco persistente** de Render montado en `/var/data`: así sobrevive despliegues y reinicios. Los discos persistentes requieren un plan de pago (Starter o superior).
 
-**Opción B, servicio que ya existe (creado a mano):** en el servicio, **Environment**, agrega:
+**Opción A, servicio nuevo con Blueprint:** **New → Blueprint**, elige el repositorio. `render.yaml` crea el servicio Docker (plan Starter, rama `main`, despliegue automático), el disco `datos` en `/var/data` y una `SECRET_KEY` aleatoria. Solo pedirá `DEMO_PASSWORD`.
+
+**Opción B, servicio que ya existe:**
+
+1. **Settings → Instance Type:** Starter (o superior).
+2. **Disks → Add Disk:** nombre `datos`, *Mount Path* `/var/data`, tamaño 1 GB.
+3. **Environment:**
 
 | Variable | Valor |
 |---|---|
+| `DATA_DIR` | `/var/data` |
 | `SECRET_KEY` | botón **Generate** (aleatoria, ≥ 32 caracteres) |
-| `DATABASE_URL` | la **Internal Database URL** de una base PostgreSQL de Render (**New → PostgreSQL**) |
 | `DEMO_PASSWORD` | contraseña inicial de `jimena` y `carlos` (≥ 10 caracteres) |
 | `SEED` | `inicial` (doctores + 4 pacientes) o `demo` (demostración completa) |
 
-En producción la app no arranca si falta `SECRET_KEY` o `DATABASE_URL` (sin base PostgreSQL los datos se perderían en cada despliegue), y el mensaje del log dice exactamente qué falta. `DEMO_PASSWORD` solo se usa la primera vez, al crear las cuentas en una base vacía; después cada doctor cambia su contraseña en Configuración.
+En producción la app no arranca si falta `SECRET_KEY` o si `DATA_DIR` no apunta a un disco donde pueda escribir; el log dice exactamente qué falta. `DEMO_PASSWORD` solo se usa la primera vez, al crear las cuentas; después cada doctor cambia su contraseña en Configuración. Si algún día prefieres PostgreSQL, define `DATABASE_URL` y la app la usa en lugar del archivo.
 
 En `.env.example` están todas las variables (Google Calendar, alertas, zona horaria, datos del establecimiento).
 

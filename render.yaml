@@ -1,13 +1,17 @@
-# Blueprint de Render: crea el servicio web (Docker) + una base PostgreSQL.
+# Blueprint de Render: servicio web (Docker) con la base SQLite dentro del contenedor, en un disco persistente.
 # Render > New > Blueprint > selecciona el repositorio.
 services:
   - type: web
     name: consultorio-dental-jm
     runtime: docker
-    plan: free
+    plan: starter          # los discos persistentes requieren plan de pago
     region: oregon
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
+    disk:                  # aquí vive la base (crm_dental.db): sobrevive despliegues y reinicios
+      name: datos
+      mountPath: /var/data
+      sizeGB: 1
     branch: main
     autoDeploy: true
     envVars:
@@ -25,16 +29,9 @@ services:
         value: America/Mexico_City
       - key: WHATSAPP_COUNTRY_CODE
         value: "52"
-      - key: DATABASE_URL
-        fromDatabase:
-          name: consultorio-jm-db
-          property: connectionString
+      - key: DATA_DIR
+        value: /var/data
       # Opcional: pega aquí el JSON completo de la cuenta de servicio de Google
       - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
 
-databases:
-  - name: consultorio-jm-db
-    plan: free
-    databaseName: consultorio_jm
-    user: consultorio

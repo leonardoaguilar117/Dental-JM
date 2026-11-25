@@ -25,10 +25,23 @@ def _check_production() -> None:
     if config.SECRET_KEY == config.DEFAULT_SECRET or len(config.SECRET_KEY) < 32:
         missing.append("SECRET_KEY: un valor aleatorio de al menos 32 caracteres (en Render: Add Environment Variable > Generate)")
     if not os.getenv("DATABASE_URL", "").strip():
-        missing.append("DATABASE_URL: la 'Internal Database URL' de tu base PostgreSQL de Render "
-                       "(sin ella los datos se guardarían dentro del contenedor y se borrarían en cada despliegue)")
+        # base dentro del contenedor: solo si vive en un disco persistente (si no, se borra en cada despliegue)
+        data_dir = os.getenv("DATA_DIR", "").strip()
+        if not data_dir:
+            missing.append("DATA_DIR: la ruta del disco persistente del servicio (/var/data). Sin disco, la base "
+                           "del contenedor se borraría en cada despliegue y reinicio")
+        else:
+            probe = os.path.join(data_dir, ".escritura")
+            try:
+                os.makedirs(data_dir, exist_ok=True)
+                with open(probe, "w") as fh:
+                    fh.write("ok")
+                os.remove(probe)
+            except OSError as exc:
+                missing.append(f"DATA_DIR={data_dir} no se puede escribir ({exc}). Revisa que el disco persistente "
+                               "esté montado en esa ruta (Render > Disks)")
     if missing:
-        raise RuntimeError("Falta configurar en Render > Environment:\n  - " + "\n  - ".join(missing))
+        raise RuntimeError("Falta configurar en Render:\n  - " + "\n  - ".join(missing))
 
 
 _check_production()
