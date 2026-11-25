@@ -45,11 +45,20 @@ docker run -p 8000:8000 -e SECRET_KEY=algo-secreto consultorio-jm
 
 ## Render
 
-1. Sube el proyecto a GitHub.
-2. En Render, ve a **New → Blueprint** y elige el repositorio. Render usa `render.yaml` para crear el servicio Docker y la base PostgreSQL.
-3. Cuando termine el despliegue, entra con `jimena` y la contraseña de `DEMO_PASSWORD` (o la temporal del log del primer arranque) y cámbiala en Configuración.
+**Opción A, servicio nuevo con Blueprint (recomendada):** en Render, **New → Blueprint**, elige el repositorio y Render crea, con `render.yaml`, el servicio Docker (rama `main`, despliegue automático), la base PostgreSQL y una `SECRET_KEY` aleatoria. Solo te pedirá `DEMO_PASSWORD`.
 
-En `.env.example` están las variables disponibles (Google Calendar, alertas, zona horaria).
+**Opción B, servicio que ya existe (creado a mano):** en el servicio, **Environment**, agrega:
+
+| Variable | Valor |
+|---|---|
+| `SECRET_KEY` | botón **Generate** (aleatoria, ≥ 32 caracteres) |
+| `DATABASE_URL` | la **Internal Database URL** de una base PostgreSQL de Render (**New → PostgreSQL**) |
+| `DEMO_PASSWORD` | contraseña inicial de `jimena` y `carlos` (≥ 10 caracteres) |
+| `SEED` | `inicial` (doctores + 4 pacientes) o `demo` (demostración completa) |
+
+En producción la app no arranca si falta `SECRET_KEY` o `DATABASE_URL` (sin base PostgreSQL los datos se perderían en cada despliegue), y el mensaje del log dice exactamente qué falta. `DEMO_PASSWORD` solo se usa la primera vez, al crear las cuentas en una base vacía; después cada doctor cambia su contraseña en Configuración.
+
+En `.env.example` están todas las variables (Google Calendar, alertas, zona horaria, datos del establecimiento).
 
 ## Regenerar el PDF
 

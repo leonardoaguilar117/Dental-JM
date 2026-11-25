@@ -95,10 +95,10 @@
       {% set _ = extra.append(('/configuracion', 'settings', 'Ajustes', None, path.startswith('/configuracion'))) %}
       {% set _ = extra.append(('/configuracion#seguridad', 'lock', 'Contraseña', None, False)) %}
       {% set _ = extra.append(('/logout', 'logout', 'Salir', None, False)) %}
-      {% set items = sections[4:] + extra %}
+      {% set menu_items = sections[4:] + extra %}
       <div class="more-grid">
         <a class="more-item more-me {{ 'active' if path.startswith('/configuracion') }}" href="/configuracion#perfil" style="--ri:0"><span class="tile">{{ avatar(user.initials, user.color, '', user.avatar_src) }}</span><span class="more-label">Mi perfil</span></a>
-        {% for href, ic, label, count, on in items %}
+        {% for href, ic, label, count, on in menu_items %}
         <a class="more-item {{ 'active' if on }}" href="{{ href }}" style="--ri:{{ loop.index }}"><span class="tile">{{ icon(ic) }}{% if count %}<span class="bubble {{ 'hot' if ic == 'bell' or (ic == 'box' and nav.inventario_urgente) }}">{{ count }}</span>{% endif %}</span><span class="more-label">{{ label }}</span></a>
         {% endfor %}
       </div>

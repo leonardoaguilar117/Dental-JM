@@ -15,14 +15,23 @@ from .web import BASE_DIR, Forbidden, NotAuthenticated, redirect, templates
 
 logging.basicConfig(level=logging.INFO)
 
-if config.IS_PRODUCTION and config.SECRET_KEY == config.DEFAULT_SECRET:
-    # Nunca la clave de ejemplo en producción. Si no se configuró SECRET_KEY, se usa una aleatoria por arranque:
-    # es segura, pero las sesiones se cierran en cada reinicio. Defínela en Render > Environment para fijarla.
-    import secrets
-    config.SECRET_KEY = secrets.token_urlsafe(48)
-    logging.getLogger("consultorio").warning(
-        "SECRET_KEY no está definida: se generó una clave temporal. Agrégala en Render > Environment "
-        "para que las sesiones no se cierren en cada reinicio.")
+def _check_production() -> None:
+    """En producción no se arranca con valores provisionales: se dice exactamente qué falta y dónde ponerlo."""
+    import os
+
+    if not config.IS_PRODUCTION:
+        return
+    missing = []
+    if config.SECRET_KEY == config.DEFAULT_SECRET or len(config.SECRET_KEY) < 32:
+        missing.append("SECRET_KEY: un valor aleatorio de al menos 32 caracteres (en Render: Add Environment Variable > Generate)")
+    if not os.getenv("DATABASE_URL", "").strip():
+        missing.append("DATABASE_URL: la 'Internal Database URL' de tu base PostgreSQL de Render "
+                       "(sin ella los datos se guardarían dentro del contenedor y se borrarían en cada despliegue)")
+    if missing:
+        raise RuntimeError("Falta configurar en Render > Environment:\n  - " + "\n  - ".join(missing))
+
+
+_check_production()
 
 # Producción: sin documentación pública de la API (expone todas las rutas del expediente)
 app = FastAPI(title=config.APP_NAME, version="1.0.0-demo", redoc_url=None,
