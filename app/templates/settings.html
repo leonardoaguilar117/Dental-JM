@@ -7,7 +7,7 @@
     <div class="card card-pad" id="perfil">
       <h2 style="margin-bottom:12px">Mi perfil</h2>
       <form method="post" action="/configuracion/foto" class="photo-row" data-photo>
-        <span class="photo-wrap">{{ avatar(user.initials, user.color, 'avatar-xl', user.photo) }}</span>
+        <span class="photo-wrap">{{ avatar(user.initials, user.color, 'avatar-xl', user.avatar_src) }}</span>
         <div>
           <b>{{ user.full_name }}</b><div class="muted">{{ user.specialty }} · usuario «{{ user.username }}»</div>
           <div class="row wrap mt" style="gap:8px">

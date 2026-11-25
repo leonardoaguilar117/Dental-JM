@@ -1,75 +1,131 @@
 {% extends "base.html" %}
-{% from "_icons.html" import status_pill %}
+{% from "_icons.html" import status_pill, avatar %}
 {% block title %}Inicio{% endblock %}
+{% block topactions %}{% endblock %}{# en el inicio, los accesos rápidos ya agendan y registran pacientes #}
 {% block content %}
-{% set mes_qs = year ~ '-' ~ '%02d'|format(month) %}
-{% macro delta(v, invert=False) -%}
-  {%- if v is none -%}sin mes previo para comparar
-  {%- else -%}
-    {%- set good = (v >= 0) != invert -%}
-    <span class="{{ 'delta-up' if good else 'delta-down' }}">{{ '+' if v >= 0 }}{{ v }}%</span> vs. mes anterior
-  {%- endif -%}
-{%- endmacro %}
+{% set hora = now_hour() %}
 
 <div class="bento">
-  {# ---------- héroe: saludo + hallazgo + escena 3D ---------- #}
-  <section class="hero b-hero" aria-label="Resumen del día">
+  {# ---------- héroe: saludo + lo que pide atención (cada chip lleva a donde se resuelve) ---------- #}
+  <section class="hero b-hero" aria-label="Resumen del día" data-rv="hero">
     <div class="hero-text">
-      <h1 style="view-transition-name: page-title">{{ user.short_name }} · {{ month_name|capitalize }}</h1>
-      {% if finding %}
-      <p class="finding">Hoy: {% for f in finding %}<b>{{ f }}</b>{{ ' · ' if not loop.last }}{% endfor %}.</p>
-      {% else %}<p class="finding">Todo al día: sin pendientes urgentes.</p>{% endif %}
-      <div class="row wrap" style="gap:8px">
-        <a class="btn btn-sm btn-wa" href="/avisos">{{ icon('message') }} Enviar recordatorios</a>
-      </div>
-      <div class="controls">
-        <div class="month-nav">
-          <a href="/?mes={{ prev_mes }}" aria-label="Mes anterior">{{ icon('chev-left') }}</a>
-          <span>{{ month_name }} {{ year }}</span>
-          <a href="/?mes={{ next_mes }}" aria-label="Mes siguiente">{{ icon('chev-right') }}</a>
+      <div class="hello">
+        {{ avatar(user.initials, user.color, 'avatar-lg', user.avatar_src) }}
+        <div>
+          <h1 style="view-transition-name: page-title">{{ 'Buenos días' if hora < 12 else ('Buenas tardes' if hora < 19 else 'Buenas noches') }}, {{ user.short_name }}</h1>
+          <p class="hello-sub">{{ today()|fecha('larga')|capitalize }}</p>
         </div>
       </div>
+      {% if finding %}
+      <ul class="finding-chips" aria-label="Pendientes de hoy">
+        {% for f in finding %}<li style="--i:{{ loop.index0 }}"><a href="{{ f.href }}" class="{{ 'hot' if f.hot }}">{{ f.t|capitalize }}</a></li>{% endfor %}
+      </ul>
+      {% else %}<p class="finding">Todo al día: sin pendientes.</p>{% endif %}
     </div>
     <div class="scene" data-hero3d aria-hidden="true">
       <div class="scene-skeleton"></div>
-      <span class="scene-hint">{{ icon('cube') }} Mueve el cursor</span>
     </div>
   </section>
 
-  {# ---------- indicadores en pila ---------- #}
-  <section class="card b-kpis" aria-label="Indicadores del mes">
-    <div class="kpi-stack">
-      <div>
-        <span class="kpi-label"><span class="swatch" style="background:var(--data)"></span>Ingresos</span>
-        <span class="kpi-value lead" data-count="{{ summary.ingresos.total }}" data-money>{{ summary.ingresos.total|money0 }}</span>
-        <span class="kpi-sub">{{ delta(summary.var_ingresos) }}{% if summary.ingresos.ventas %} · {{ summary.ingresos.ventas|money0 }} del depósito{% endif %}</span>
+  {# ---------- próxima cita ---------- #}
+  <section class="card next b-kpis" aria-label="Próxima cita" data-rv="drop">
+    <div class="card-head"><h2>Próxima cita</h2></div>
+    {% if next_appt %}
+    {% set na = next_appt %}
+    <div class="next-body">
+      <a class="next-who" href="/pacientes/{{ na.patient_id }}">
+        {{ avatar(na.patient.initials, na.doctor.color, 'avatar-xl', na.patient.avatar_src) }}
+        <span><b>{{ na.patient.full_name }}</b><small>{{ na.type }}</small></span>
+      </a>
+      <div class="next-when">
+        <span>{{ icon('calendar') }}{{ 'Hoy' if na.start.date() == today() else na.start|fecha('corta')|capitalize }}</span>
+        <span>{{ icon('clock') }}{{ na.start|fecha('hora') }}–{{ na.end|fecha('hora') }}</span>
+        {{ status_pill(na.status) }}
       </div>
-      <div>
-        <span class="kpi-label"><span class="swatch" style="background:var(--data-2)"></span>Egresos</span>
-        <span class="kpi-value" data-count="{{ summary.egresos.total }}" data-money>{{ summary.egresos.total|money0 }}</span>
-        <span class="kpi-sub">{{ delta(summary.var_egresos, True) }}</span>
-      </div>
-      <div>
-        <span class="kpi-label">Utilidad</span>
-        <span class="kpi-value" style="color:{{ 'var(--positive)' if summary.utilidad >= 0 else 'var(--negative)' }}" data-count="{{ summary.utilidad }}" data-money>{{ summary.utilidad|money0 }}</span>
-        <span class="kpi-sub">Ingresos menos egresos del mes</span>
-      </div>
-      <div>
-        <span class="kpi-label">Por cobrar</span>
-        <span class="kpi-value" data-count="{{ receivable_total }}" data-money>{{ receivable_total|money0 }}</span>
-        <span class="kpi-sub"><a class="go" href="/finanzas?tab=cobrar">{{ receivable_items|length }}{{ '+' if receivable_items|length >= 6 }} saldos abiertos {{ icon('arrow-right') }}</a></span>
+      {% set after = to_attend|selectattr('start', 'gt', na.start)|list %}
+      {% if after %}
+      <ul class="next-after" aria-label="Después hoy">
+        {% for a in after[:3] %}
+        <li><a href="/citas/{{ a.id }}"><span class="tnum">{{ a.start|fecha('hora') }}</span><b>{{ a.patient.first_name }} {{ a.patient.last_name.split()[0] }}</b><small>{{ a.type }}</small></a></li>
+        {% endfor %}
+      </ul>
+      {% elif na.start.date() == today() %}<p class="next-last">Es tu última cita de hoy.</p>
+      {% endif %}
+      <div class="next-actions">
+        <a class="btn" href="/citas/{{ na.id }}">Ver cita</a>
+        {% if next_wa %}<a class="btn btn-wa" href="{{ next_wa }}" target="_blank" rel="noopener">{{ icon('message') }} WhatsApp</a>{% endif %}
       </div>
     </div>
+    {% else %}
+    <div class="next-body next-empty">
+      <span class="next-empty-art" aria-hidden="true">{{ icon('calendar') }}</span>
+      {% if unmarked %}
+      <p><b>No quedan citas por atender hoy</b>{{ unmarked|length }} cita{{ 's' if unmarked|length != 1 }} de hoy sigue{{ 'n' if unmarked|length != 1 }} sin marcar como atendida{{ 's' if unmarked|length != 1 }}.</p>
+      <a class="btn" href="/citas/{{ unmarked[0].id }}">Marcar la de las {{ unmarked[0].start|fecha('hora') }}</a>
+      {% else %}
+      <p><b>Sin citas pendientes</b>No hay citas en los próximos siete días.</p>
+      {% endif %}
+    </div>
+    {% endif %}
   </section>
 
-  {# ---------- jornada de hoy ---------- #}
-  <section class="day b-full" aria-label="Jornada de hoy">
+  {# ---------- avisos por WhatsApp: el trabajo principal del inicio, en lista compacta ---------- #}
+  <section class="card avisos b-full" id="avisos" aria-labelledby="avisos-title" data-rv="timeline">
     <div class="card-head">
-      <h2>{{ icon('clock') }}Jornada de hoy <span class="muted" style="font-weight:400">· {{ day.count }} cita{{ 's' if day.count != 1 }}</span></h2>
-      <div class="row wrap" style="gap:14px">
-        <div class="day-legend"><span><span class="swatch" style="background:var(--control)"></span>Atendida</span><span><span class="swatch" style="background:repeating-linear-gradient(135deg,var(--control) 0 2px,var(--sheet) 2px 4px)"></span>Cancelada</span></div>
-        <a class="go" href="/agenda">Agenda {{ icon('arrow-right') }}</a>
-      </div>
+      <h2 id="avisos-title" class="tl" style="--i:0">Por avisar por WhatsApp <span class="muted" style="font-weight:400">· {{ feed|length }}</span></h2>
+      {% if feed|length > 6 %}<a class="go tl" style="--i:1" href="/avisos">Ver los {{ feed|length }} {{ icon('arrow-right') }}</a>{% endif %}
+    </div>
+    {% if feed %}
+    <ul class="send-list">
+      {% for f in feed[:6] %}
+      <li class="tl" style="--i:{{ loop.index0 + 1 }}">
+        {{ avatar(f.p.initials, user.color, '', f.p.avatar_src) }}
+        <div class="sl-who">
+          <a href="/pacientes/{{ f.p.id }}">{{ f.p.full_name }}</a>
+          <span>{{ f.what }}</span>
+        </div>
+        {% if f.kind == 'conf' %}<span class="pill pill-info">Confirmar · mañana {{ f.when|fecha('hora') }}</span>
+        {% elif f.late %}<span class="pill pill-bad">Vencido {{ f.when|rel }}</span>
+        {% else %}<span class="pill">{{ f.when|rel|capitalize }}</span>{% endif %}
+        {% if f.wa %}
+          {% if f.kind == 'rem' %}<form id="sent-{{ f.id }}" method="post" action="/recordatorios/{{ f.id }}/enviado" class="inline-form"><input type="hidden" name="next" value="/#avisos"></form>{% endif %}
+          <a class="btn btn-wa sl-send" href="{{ f.wa }}" target="_blank" rel="noopener" {% if f.kind == 'rem' %}data-mark-sent="sent-{{ f.id }}"{% endif %} aria-label="Enviar WhatsApp a {{ f.p.full_name }}">{{ icon('message') }} Enviar</a>
+        {% else %}
+          <a class="btn sl-send" href="/pacientes/{{ f.p.id }}/editar" title="Sin teléfono registrado">Agregar teléfono</a>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="sl-note">Al enviar un recordatorio, queda marcado como enviado.</p>
+    {% else %}
+    <div class="empty">Nada por avisar: todos tus pacientes están al día.</div>
+    {% endif %}
+  </section>
+
+  {# ---------- accesos rápidos (en el celular, "Nueva cita" ya es el botón + de la barra) ---------- #}
+  <nav class="quick b-full" aria-label="Accesos rápidos" data-rv="rise">
+    <a class="qa qa-green qa-desk" href="/citas/nueva" style="--i:0"><span class="qa-art">{{ icon('calendar') }}</span><b>Nueva cita</b><small>Agenda y avisa por WhatsApp</small></a>
+    <a class="qa qa-lav" href="/pacientes/nuevo" style="--i:1"><span class="qa-art">{{ icon('users') }}</span><b>Nuevo paciente</b><small>Ficha e historia clínica</small></a>
+    <a class="qa qa-sky" href="/finanzas?tab=cobrar" style="--i:2"><span class="qa-art">{{ icon('wallet') }}</span><b>Cobrar saldos</b><small>{{ receivable_total|money0 }} por cobrar</small></a>
+    <a class="qa qa-plain" href="/finanzas?tab=gastos" style="--i:3"><span class="qa-art">{{ icon('receipt') }}</span><b>Registrar gasto</b><small>{{ summary.egresos.total|money0 }} en {{ month_name }}</small></a>
+  </nav>
+
+  {# ---------- semana en chips ---------- #}
+  <section class="card week b-full" aria-label="Tu semana" data-rv="drop">
+    <div class="card-head"><h2>Tu semana</h2><span class="muted">{{ upcoming_count }} cita{{ 's' if upcoming_count != 1 }} por delante</span></div>
+    <ol class="daychips">
+      {% for d in week %}
+      <li style="--i:{{ loop.index0 }}"><a class="daychip {{ 'on' if d.today }}" href="/agenda?fecha={{ d.date.isoformat() }}" aria-label="{{ d.date|fecha('larga') }}: {{ d.n }} cita{{ 's' if d.n != 1 }}">
+        <small>{{ 'Hoy' if d.today else d.dow }}</small><b>{{ d.date.day }}</b><span class="dc-n">{% if d.n %}{{ d.n }} cita{{ 's' if d.n != 1 }}{% else %}Libre{% endif %}</span></a></li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  {# ---------- jornada de hoy (ambos doctores): carriles en escritorio, lista en el celular ---------- #}
+  <section class="day b-full" aria-label="Jornada de hoy" data-rv="drop">
+    <div class="card-head">
+      <h2>Jornada de hoy <span class="muted" style="font-weight:400">· {{ day.count }} cita{{ 's' if day.count != 1 }}</span></h2>
+      <div class="day-legend"><span><span class="swatch" style="background:var(--control)"></span>Atendida</span><span><span class="swatch swatch-cancel"></span>Cancelada</span></div>
     </div>
     <div class="day-scroll">
       <div class="day-grid">
@@ -84,130 +140,27 @@
               <b>{{ s.a.start|fecha('hora') }}</b><span>{{ s.a.patient.first_name }} {{ s.a.patient.last_name.split()[0] }}</span>
             </a>
             {% endfor %}
-            {% if not lane.slots %}<span style="position:absolute;left:10px;top:15px;font-size:12.5px;color:var(--faint)">Sin citas hoy</span>{% endif %}
+            {% if not lane.slots %}<span class="lane-empty">Sin citas hoy</span>{% endif %}
           </div>
         </div>
         {% endfor %}
         {% if day.now_pct is not none %}<div class="now-line" data-t="{{ day.now }}" style="left:calc(var(--lane-w) + ({{ day.now_pct }} / 100) * (100% - var(--lane-w) - 18px))"></div>{% endif %}
       </div>
     </div>
-  </section>
-
-  {# ---------- gráfica + avisos ---------- #}
-  <section class="card b-7">
-    <div class="card-head">
-      <h2>{{ icon('trend') }}Ingresos y egresos · 6 meses</h2>
-      <div class="day-legend"><span><span class="swatch" style="background:var(--data)"></span>Ingresos</span><span><span class="swatch" style="background:var(--data-2)"></span>Egresos</span></div>
-    </div>
-    <div class="card-body"><div style="height:260px"><canvas id="chartSeries" aria-label="Gráfica de ingresos y egresos"></canvas></div></div>
-  </section>
-
-  <section class="card b-5">
-    <div class="card-head"><h2>{{ icon('bell') }}Avisos para hoy</h2><a class="go" href="/avisos">Todos {{ icon('arrow-right') }}</a></div>
-    <ul class="list">
-      {% for item in notif.reminders[:4] %}
-      <li>
-        <div class="grow">
-          <span class="title">{{ item.r.patient.full_name }}</span>
-          <div class="meta">{{ item.r.kind }} · <span class="{{ 'delta-down' if item.overdue }}">{{ item.r.due_date|rel }}</span></div>
-        </div>
-        <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener" aria-label="Enviar WhatsApp a {{ item.r.patient.full_name }}">{{ icon('message') }} Enviar</a>
+    {% set rows = [] %}
+    {% for lane in day.lanes %}{% for s in lane.slots %}{% set _ = rows.append({'a': s.a, 'lane': lane}) %}{% endfor %}{% endfor %}
+    <ol class="day-list">
+      {% for r in rows|sort(attribute='a.start') %}
+      <li class="{{ 'done' if r.a.status in ['atendida','no asistió'] }} {{ 'cancel' if r.a.status == 'cancelada' }}">
+        <a href="/citas/{{ r.a.id }}" style="--c:{{ r.lane.color }}">
+          <span class="dl-time tnum">{{ r.a.start|fecha('hora') }}</span>
+          <span class="dl-who"><b>{{ r.a.patient.full_name }}</b><small>{{ r.a.type }} · {{ r.lane.short }}</small></span>
+          {{ status_pill(r.a.status) }}
+        </a>
       </li>
-      {% endfor %}
-      {% for item in notif.confirmations[:2] %}
-      <li>
-        <div class="grow">
-          <span class="title">Confirmar a {{ item.a.patient.first_name }} {{ item.a.patient.last_name.split()[0] }}</span>
-          <div class="meta">Mañana {{ item.a.start|fecha('hora') }} · {{ item.a.type }}</div>
-        </div>
-        <a class="btn btn-xs btn-wa" href="{{ item.wa }}" target="_blank" rel="noopener">{{ icon('message') }} Confirmar</a>
-      </li>
-      {% endfor %}
-      {% if not notif.reminders and not notif.confirmations %}<li><div class="empty grow">Sin mensajes pendientes.</div></li>{% endif %}
-    </ul>
+      {% else %}<li class="lane-empty">Sin citas hoy.</li>{% endfor %}
+    </ol>
   </section>
-
-  {# ---------- tratamientos + columna lateral ---------- #}
-  <section class="card b-8">
-    <div class="card-head"><h2>{{ icon('tooth') }}Tratamientos en proceso</h2><span class="muted">{{ active_treatments|length }} activos</span></div>
-    {% if active_treatments %}
-    <div class="table-wrap stack-sm"><table class="table">
-      <thead><tr><th>Paciente</th><th>Tratamiento</th><th class="num">Avance clínico</th><th class="num">Pagado</th><th class="num">Saldo</th></tr></thead>
-      <tbody>
-      {% for t in active_treatments %}
-        <tr>
-          <td><a class="rowlink" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a>
-</td>
-          <td>{{ t.name }}</td>
-          <td class="num" data-l="Avance" style="min-width:140px"><div class="row"><div class="progress" style="flex:1"><span style="width:{{ t.progress_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.sessions_done }}/{{ t.sessions_planned }}</small></div></td>
-          <td class="num" data-l="Pagado" style="min-width:120px"><div class="row"><div class="progress blue" style="flex:1"><span style="width:{{ t.paid_pct }}%;animation-delay:{{ loop.index0 * 40 }}ms"></span></div><small class="tnum">{{ t.paid_pct }}%</small></div></td>
-          <td class="num" data-l="Saldo">{{ t.balance|money0 }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table></div>
-    {% else %}<div class="empty">No hay tratamientos en proceso.</div>{% endif %}
-  </section>
-
-  <aside class="stack b-4" aria-label="Pendientes">
-    {% if inv %}
-    <section>
-      <h2 class="rail-head">Depósito dental <a class="go" href="/inventario">Inventario {{ icon('arrow-right') }}</a></h2>
-      <div class="stack" style="gap:8px">
-        {% if inv.expired %}<a href="/inventario?filtro=caducados" class="alert-box alert-bad">{{ icon('alert') }}<span><b>{{ inv.expired|length }} lote{{ 's' if inv.expired|length != 1 }} caducado{{ 's' if inv.expired|length != 1 }}</b> con existencia. Dar de baja.</span></a>{% endif %}
-        {% if inv.expiring %}<a href="/inventario?filtro=caducar" class="alert-box alert-warn">{{ icon('clock') }}<span><b>{{ inv.expiring|length }} por caducar</b> en {{ cfg.EXPIRY_ALERT_DAYS }} días. Primero: {{ inv.expiring[0].product.name }}, {{ inv.expiring[0].expiry_date|rel }}.</span></a>{% endif %}
-        {% if inv.low %}<a href="/inventario?filtro=bajo" class="alert-box alert-info">{{ icon('box') }}<span><b>{{ inv.low|length }} bajo mínimo:</b> {{ inv.low[:2]|map(attribute='name')|join(', ') }}{% if inv.low|length > 2 %} y {{ inv.low|length - 2 }} más{% endif %}.</span></a>{% endif %}
-        {% if not inv.expired and not inv.expiring and not inv.low %}<div class="card empty">Inventario en orden.</div>{% endif %}
-      </div>
-    </section>
-    {% endif %}
-    <section>
-      <h2 class="rail-head">Saldos más altos <a class="go" href="/finanzas?tab=cobrar">Ver todos {{ icon('arrow-right') }}</a></h2>
-      <div class="card">
-        {% if receivable_items %}
-        <ul class="list">
-          {% for t in receivable_items[:3] %}
-          <li>
-            <div class="grow">
-              <a class="title" href="/pacientes/{{ t.patient_id }}#tratamientos">{{ t.patient.full_name }}</a>
-              <div class="meta">{{ t.name }} · pagado {{ t.paid_pct }}%</div>
-            </div>
-            <b class="tnum" style="font-weight:500">{{ t.balance|money0 }}</b>
-            {% if t.doctor_id == user.id %}<a class="btn btn-xs btn-primary" href="/pacientes/{{ t.patient_id }}?cobrar={{ t.id }}">Cobrar</a>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}<div class="empty">Sin saldos pendientes.</div>{% endif %}
-      </div>
-    </section>
-    <section>
-      <h2 class="rail-head">Gastos de {{ month_name }} <span class="muted tnum" style="font-weight:400">{{ summary.egresos.total|money0 }}</span></h2>
-      <div class="card">
-        {% if summary.egresos.por_categoria %}
-        <ul class="barlist">
-          {% for cat, val in summary.egresos.por_categoria.items() %}{% if loop.index <= 5 %}
-          <li><span class="bl-name">{{ cat }}</span><span class="bl-val">{{ val|money0 }}</span>
-            <span class="bl-bar"><span style="width:{{ (100 * val / max_cat)|round(1) if max_cat else 0 }}%;animation-delay:{{ loop.index0 * 50 }}ms"></span></span></li>
-          {% endif %}{% endfor %}
-        </ul>
-        {% else %}<div class="empty">Sin gastos registrados este mes.</div>{% endif %}
-      </div>
-    </section>
-  </aside>
-
-  {% if settlement %}
-  <section class="card b-full">
-    <div class="card-head"><h2>{{ icon('wallet') }}Gastos compartidos · quién le debe a quién</h2><span class="muted">{{ month_name|capitalize }}</span></div>
-    <div class="table-wrap"><table class="table">
-      <thead><tr><th>Doctor</th><th class="num">Pagó</th><th class="num">Le corresponde</th><th class="num">Diferencia</th></tr></thead>
-      <tbody>{% for s in settlement %}
-        <tr><td><span class="row" style="gap:8px"><span class="swatch" style="background:{{ s.user.color }}"></span>{{ s.user.full_name }} <small class="muted">{{ s.user.shared_expense_pct|int }}%</small></span></td>
-          <td class="num">{{ s.pagado|money }}</td><td class="num">{{ s.corresponde|money }}</td>
-          <td class="num" style="color:{{ 'var(--positive)' if s.diferencia > 0 else ('var(--negative)' if s.diferencia < 0 else 'var(--muted)') }}">{{ '+' if s.diferencia > 0 }}{{ s.diferencia|money }}</td></tr>
-      {% endfor %}</tbody>
-    </table></div>
-  </section>
-  {% endif %}
 </div>
 {% endblock %}
 
@@ -216,42 +169,5 @@
 (() => { const sc = document.querySelector(".day-scroll"), now = document.querySelector(".now-line");
   if (sc && now && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth * 0.6); })();
 </script>
-<script type="module">window.jmAfterEnter(() => import("/static/js/hero3d.js?v=3"));</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-const money = v => (v < 0 ? "-$" : "$") + Math.abs(Number(v)).toLocaleString("es-MX", {maximumFractionDigits: 0});
-Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
-Chart.defaults.font.size = 12;
-const series = {{ chart|tojson }};
-const c = themeColor;
-window.jmAfterEnter(() => {
-const chart = new Chart(document.getElementById("chartSeries"), {
-  type: "bar",
-  data: { labels: series.labels, datasets: [
-    { label: "Ingresos", data: series.ingresos, backgroundColor: c("--data"), borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
-    { label: "Egresos", data: series.egresos, backgroundColor: c("--data-2"), borderRadius: 4, maxBarThickness: 26, categoryPercentage: .62, barPercentage: .9 },
-  ]},
-  options: {
-    maintainAspectRatio: false,
-    animation: { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700, easing: "easeOutQuart" },
-    interaction: { mode: "index", intersect: false },
-    plugins: { legend: { display: false },
-      tooltip: { padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true, callbacks: { label: x => ` ${x.dataset.label}: ${money(x.raw)}` } } },
-    scales: { y: { ticks: { callback: money, maxTicksLimit: 5 }, border: { display: false } }, x: { grid: { display: false } } }
-  }
-});
-function paintChart() {
-  const [a, b] = chart.data.datasets;
-  a.backgroundColor = c("--data"); a.hoverBackgroundColor = c("--data-ink");
-  b.backgroundColor = c("--data-2"); b.hoverBackgroundColor = c("--data-2-hover");
-  chart.options.color = c("--muted");
-  chart.options.scales.y.ticks.color = c("--muted"); chart.options.scales.x.ticks.color = c("--muted");
-  chart.options.scales.y.grid.color = c("--rule"); chart.options.scales.x.border.color = c("--border");
-  chart.options.plugins.tooltip.backgroundColor = c("--toast"); chart.options.plugins.tooltip.titleColor = c("--toast-ink"); chart.options.plugins.tooltip.bodyColor = c("--toast-ink");
-  chart.update("none");
-}
-paintChart();
-window.addEventListener("themechange", paintChart);
-});
-</script>
+<script type="module">window.jmAfterEnter(() => import("/static/js/hero3d.js?v=7"));</script>
 {% endblock %}

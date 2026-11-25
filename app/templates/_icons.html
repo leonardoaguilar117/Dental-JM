@@ -56,7 +56,7 @@
 {%- endmacro %}
 
 {% macro avatar(text, color, cls='', photo='') -%}
-<span class="avatar {{ cls }}{{ ' has-photo' if photo }}" style="background: {{ color }}">{% if photo %}<img src="{{ photo }}" alt="" loading="lazy">{% else %}{{ text }}{% endif %}</span>
+<span class="avatar {{ cls }}{{ ' has-photo' if photo }}{{ ' is-art' if photo and '/avatars/' in photo }}" style="--av: {{ color }}">{% if photo %}<img src="{{ photo }}" alt="" loading="lazy">{% else %}{{ text }}{% endif %}</span>
 {%- endmacro %}
 
 {% macro theme_picker(th) -%}

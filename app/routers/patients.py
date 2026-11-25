@@ -19,7 +19,7 @@ PATIENT_FIELDS = ["first_name", "last_name", "sex", "phone", "email", "address",
 PATIENT_MAX = {"first_name": 80, "last_name": 120, "sex": 12, "phone": 20, "email": 120, "address": 255,
                "occupation": 80, "emergency_contact": 160, "notes": 2000, "curp": 18, "estado_civil": 20,
                "lugar_nacimiento": 80}
-SEX_OPTIONS = ["", "Femenino", "Masculino", "Otro"]
+SEX_OPTIONS = ["Femenino", "Masculino"]
 CURP_RE = re.compile(r"^[A-Z]{4}\d{6}[HMX][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z0-9]\d$")
 
 HISTORY_TEXT = ["motivo_consulta", "padecimiento_actual", "antecedentes_heredofamiliares",
@@ -71,12 +71,12 @@ def _doctor_id(db: Session, raw, default: int) -> int:
 def _patient_values(f, db: Session, user: User) -> tuple[dict, str | None]:
     vals = {k: str(f.get(k, "")).strip()[:PATIENT_MAX[k]] for k in PATIENT_FIELDS}
     vals["curp"] = vals["curp"].upper()
-    if vals["sex"] not in SEX_OPTIONS:
-        vals["sex"] = ""
     if vals["estado_civil"] not in config.ESTADOS_CIVILES:
         vals["estado_civil"] = ""
     if not vals["first_name"] or not vals["last_name"]:
         return vals, "Nombre y apellidos son obligatorios."
+    if vals["sex"] not in SEX_OPTIONS:
+        return vals, "Elige el sexo del paciente: Femenino o Masculino."
     if vals["curp"] and not CURP_RE.match(vals["curp"]):
         return vals, "La CURP no tiene un formato válido (18 caracteres)."
     return vals, None

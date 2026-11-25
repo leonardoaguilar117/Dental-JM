@@ -13,7 +13,7 @@ from . import config
 from .database import get_db
 from .models import User
 from .services import notifications
-from .utils import fecha, money, money0, relative_days, today_local, whatsapp_link
+from .utils import fecha, money, money0, now_local, relative_days, today_local, whatsapp_link
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -25,6 +25,7 @@ templates.env.filters["qty"] = lambda v: f"{float(v or 0):,.2f}".rstrip("0").rst
 templates.env.globals["wa"] = whatsapp_link
 templates.env.globals["cfg"] = config
 templates.env.globals["today"] = today_local
+templates.env.globals["now_hour"] = lambda: now_local().hour
 
 
 class NotAuthenticated(Exception):

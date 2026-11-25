@@ -1,3 +1,4 @@
+import calendar
 import csv
 import io
 
@@ -43,7 +44,18 @@ def finance_home(request: Request, mes: str | None = None, tab: str = "cobros",
     summary = finance.month_summary(db, user, year, month)
     sales = finance.sales_tickets(db, user, start, end) if user.can_inventory else []
     doctors = db.scalars(select(User).order_by(User.id)).all()
+    # resumen que antes vivía en el inicio: 6 meses, gastos por categoría y tratamientos en proceso
+    chart = finance.series(db, user, year, month, 6)
+    active = sorted(db.scalars(select(Treatment).where(Treatment.status == "en proceso",
+                                                       Treatment.doctor_id == user.id)).all(),
+                    key=lambda t: -t.progress_pct)
+    t = today_local()
+    in_progress = (year, month) == (t.year, t.month)
+    month_days = calendar.monthrange(year, month)[1]
     return render(request, "finance/index.html", db, user, payments=payments, expenses=expenses,
+                  chart=chart, active_treatments=active, in_progress=in_progress, today_day=t.day,
+                  month_days=month_days,
+                  max_cat=max(summary["egresos"]["por_categoria"].values(), default=0),
                   rec_total=rec_total, rec_items=rec_items, debt_links=debt_links, summary=summary,
                   year=year, month=month, month_name=MESES[month - 1], mes=f"{year}-{month:02d}",
                   tab=tab, doctors=doctors, sales=sales, categories=config.EXPENSE_CATEGORIES,

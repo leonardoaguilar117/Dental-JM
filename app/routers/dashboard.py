@@ -5,72 +5,74 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Appointment, Patient, Treatment, User
+from ..models import Appointment, User
 from ..services import finance, inventory, notifications
-from ..utils import MESES, add_months, today_local
+from ..utils import DIAS, MESES, fecha, today_local
 from ..web import current_user, render
 
 router = APIRouter()
 
 
-def _parse_month(value: str | None) -> tuple[int, int]:
-    t = today_local()
-    if value:
-        try:
-            y, m = value.split("-")
-            return int(y), int(m)
-        except ValueError:
-            pass
-    return t.year, t.month
-
-
 @router.get("/")
-def dashboard(request: Request, mes: str | None = None,
-              db: Session = Depends(get_db), user: User = Depends(current_user)):
-    year, month = _parse_month(mes)
-    scope = user  # cada doctor ve solo sus números
-    summary = finance.month_summary(db, scope, year, month)
-    chart = finance.series(db, scope, year, month, 6)
-    receivable_total, receivable_items = finance.receivables(db, scope)
-
+def dashboard(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Inicio: el día del consultorio. Las finanzas viven en /finanzas."""
+    from ..utils import now_local, whatsapp_link
     today = today_local()
+    now = now_local().replace(tzinfo=None)
     t0 = datetime.combine(today, datetime.min.time())
     q = select(Appointment).where(Appointment.start >= t0, Appointment.start < t0 + timedelta(days=1),
-                                  Appointment.status != "cancelada").order_by(Appointment.start)
-    if scope is not None:
-        q = q.where(Appointment.doctor_id == user.id)
+                                  Appointment.status != "cancelada", Appointment.doctor_id == user.id
+                                  ).order_by(Appointment.start)
     today_appts = db.scalars(q).all()
+    open_states = ("programada", "confirmada")
+    # pendientes de hoy: las que aún no terminan (por atender) y las que ya pasaron sin cerrarse (sin marcar)
+    to_attend = [a for a in today_appts if a.status in open_states and a.end >= now]
+    unmarked = [a for a in today_appts if a.status in open_states and a.end < now]
 
     week_q = select(Appointment).where(Appointment.start >= t0 + timedelta(days=1),
                                        Appointment.start < t0 + timedelta(days=8),
-                                       Appointment.status != "cancelada")
-    if scope is not None:
-        week_q = week_q.where(Appointment.doctor_id == user.id)
-    upcoming_count = len(db.scalars(week_q).all())
+                                       Appointment.status != "cancelada", Appointment.doctor_id == user.id)
+    week_appts = db.scalars(week_q.order_by(Appointment.start)).all()
 
-    tq = select(Treatment).where(Treatment.status == "en proceso")
-    if scope is not None:
-        tq = tq.where(Treatment.doctor_id == user.id)
-    active_treatments = sorted(db.scalars(tq).all(), key=lambda t: -t.progress_pct)
+    # próxima cita: la siguiente de hoy que aún no termina; si ya no hay, la primera de los próximos días
+    next_appt = to_attend[0] if to_attend else (week_appts[0] if week_appts else None)
+    next_wa = None
+    if next_appt and next_appt.patient.phone:
+        next_wa = whatsapp_link(next_appt.patient.phone,
+                                f"Hola {next_appt.patient.first_name}, te esperamos el {fecha(next_appt.start, 'larga')} "
+                                f"a las {next_appt.start:%H:%M} en el Consultorio Dental JM.")
 
-    patients_count = len(db.scalars(select(Patient.id).where(Patient.active)).all())
+    # tira de la semana: hoy y los días siguientes (sin domingo, el consultorio no abre)
+    counts = {}
+    for a in [*today_appts, *week_appts]:
+        counts[a.start.date()] = counts.get(a.start.date(), 0) + 1
+    week = []
+    d = today
+    while len(week) < 6:
+        if d.weekday() != 6:
+            week.append({"date": d, "dow": DIAS[d.weekday()][:3], "n": counts.get(d, 0), "today": d == today})
+        d += timedelta(days=1)
+
     notif = notifications.build(db, user)
-    day = _day_strip(db, user, t0)
-    finding = _finding(notif, today_appts, user)
-    inv = inventory.alerts(db, user.id) if user.can_inventory else None
-    py, pm = add_months(year, month, -1)
-    ny, nm = add_months(year, month, 1)
+    # avisos por mandar: vencidos primero, luego confirmaciones de mañana y los próximos
+    reminders = sorted(notif["reminders"], key=lambda x: (not x["overdue"], x["r"].due_date))
+    feed = [{"kind": "rem", "id": x["r"].id, "p": x["r"].patient, "what": x["r"].kind, "late": x["overdue"],
+             "when": x["r"].due_date, "wa": x["wa"] if x["r"].patient.phone else None} for x in reminders if x["overdue"]]
+    feed += [{"kind": "conf", "id": x["a"].id, "p": x["a"].patient, "what": x["a"].type, "late": False, "when": x["a"].start,
+              "wa": x["wa"] if x["a"].patient.phone else None} for x in notif["confirmations"]]
+    feed += [{"kind": "rem", "id": x["r"].id, "p": x["r"].patient, "what": x["r"].kind, "late": False,
+              "when": x["r"].due_date, "wa": x["wa"] if x["r"].patient.phone else None} for x in reminders if not x["overdue"]]
 
+    receivable_total, _ = finance.receivables(db, user)
+    summary = finance.month_summary(db, user, today.year, today.month)
+    inv = inventory.alerts(db, user.id) if user.can_inventory else None
     return render(
         request, "dashboard.html", db, user,
-        summary=summary, chart=chart, receivable_total=receivable_total,
-        receivable_items=receivable_items[:6], today_appts=today_appts, upcoming_count=upcoming_count,
-        active_treatments=active_treatments[:8], patients_count=patients_count, notif=notif, inv=inv,
-        year=year, month=month, month_name=MESES[month - 1], vista="mia",
-        prev_mes=f"{py}-{pm:02d}", next_mes=f"{ny}-{nm:02d}",
-        settlement=None,
-        day=day, finding=finding,
-        max_cat=max(summary["egresos"]["por_categoria"].values(), default=0),
+        today_appts=today_appts, to_attend=to_attend, unmarked=unmarked,
+        upcoming_count=len(to_attend) + len(week_appts), next_appt=next_appt, next_wa=next_wa, week=week,
+        feed=feed, notif=notif, inv=inv, receivable_total=receivable_total, summary=summary,
+        month_name=MESES[today.month - 1], day=_day_strip(db, user, t0),
+        finding=_finding(notif, to_attend, unmarked, user),
     )
 
 
@@ -101,21 +103,25 @@ def _day_strip(db: Session, user: User, t0: datetime) -> dict:
             "count": len([a for a in appts if a.status != "cancelada"])}
 
 
-def _finding(notif: dict, today_appts, user: User) -> list[str]:
-    """Lo que más pide atención hoy, en palabras."""
+def _finding(notif: dict, to_attend, unmarked, user: User) -> list[dict]:
+    """Lo que más pide atención hoy, en palabras y con a dónde ir."""
     out = []
-    pending = [a for a in today_appts if a.status in ("programada", "confirmada")]
-    if pending:
-        out.append(f"{len(pending)} cita{'s' if len(pending) != 1 else ''} por atender hoy")
+    if to_attend:
+        n = len(to_attend)
+        out.append({"t": f"{n} cita{'s' if n != 1 else ''} por atender hoy", "href": "/agenda", "hot": True})
+    if unmarked:
+        n = len(unmarked)
+        out.append({"t": f"{n} cita{'s' if n != 1 else ''} de hoy sin marcar", "href": f"/citas/{unmarked[0].id}", "hot": False})
     overdue = [r for r in notif["reminders"] if r["overdue"]]
     if overdue:
-        out.append(f"{len(overdue)} recordatorio{'s' if len(overdue) != 1 else ''} vencido{'s' if len(overdue) != 1 else ''}")
+        n = len(overdue)
+        out.append({"t": f"{n} recordatorio{'s' if n != 1 else ''} vencido{'s' if n != 1 else ''}", "href": "#avisos", "hot": False})
     if notif["confirmations"]:
         n = len(notif["confirmations"])
-        out.append(f"{n} cita{'s' if n != 1 else ''} de mañana por confirmar")
+        out.append({"t": f"{n} cita{'s' if n != 1 else ''} de mañana por confirmar", "href": "#avisos", "hot": False})
     if user.can_inventory and notif["inventory"]["expired"]:
         n = len(notif["inventory"]["expired"])
-        out.append(f"{n} lote{'s' if n != 1 else ''} caducado{'s' if n != 1 else ''} en el depósito")
+        out.append({"t": f"{n} lote{'s' if n != 1 else ''} caducado{'s' if n != 1 else ''} en el depósito", "href": "/inventario?filtro=caducados", "hot": False})
     return out
 
 

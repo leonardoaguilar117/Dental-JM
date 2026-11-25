@@ -5,7 +5,7 @@
 {% include "patients/_charge.html" %}
 <div class="card mb">
   <div class="p-head">
-    <span style="display:inline-block;view-transition-name: pav-{{ p.id }}">{{ avatar(p.initials, p.primary_doctor.color if p.primary_doctor else '#64748b', 'avatar-lg') }}</span>
+    <span style="display:inline-block;view-transition-name: pav-{{ p.id }}">{{ avatar(p.initials, p.primary_doctor.color if p.primary_doctor else '#64748b', 'avatar-lg', p.avatar_src) }}</span>
     <div class="grow">
       <div class="row wrap" style="gap:8px"><h1 style="view-transition-name: pname-{{ p.id }}">{{ p.full_name }}</h1>
         {% for f in h.alert_flags %}<span class="pill pill-bad">{{ icon('alert') }} {{ f }}</span>{% endfor %}
@@ -13,7 +13,7 @@
       </div>
       <div class="p-facts">
         <span><b>{{ p.age if p.age is not none else '—' }}</b> años</span>
-        <span>{{ p.sex or 'Sexo no indicado' }}</span>
+        <span>{{ p.sex }}</span>
         {% if p.curp %}<span>CURP <b>{{ p.curp }}</b></span>{% endif %}
         <span>{{ icon('message') }} {{ p.phone or 'Sin teléfono' }}</span>
         <span>Expediente <b>#{{ '%05d'|format(p.id) }}</b></span>
@@ -477,4 +477,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script type="module" src="/static/js/typodont3d.js?v=5"></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/typodont3d.js?v=10"></script>{% endblock %}

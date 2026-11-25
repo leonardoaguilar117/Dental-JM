@@ -21,7 +21,7 @@ export function toothKind(fdi) {
 }
 const KIND_SCALE = {
   incisivo: [0.78, 1.0, 0.46],
-  canino: [0.72, 1.12, 0.66],
+  canino: [0.74, 1.0, 0.66],
   premolar: [0.78, 0.9, 0.86],
   molar: [1.08, 0.82, 1.02],
 };
@@ -35,14 +35,15 @@ export function toothGeometry(kind, { crownOnly = false } = {}) {
   // Perfil (radio, altura): raíz abajo (y<0), corona arriba (y>0). Se gira alrededor del eje Y.
   const profile = {
     incisivo: [[0, -1.7], [0.16, -1.5], [0.27, -0.9], [0.36, -0.25], [0.4, 0], [0.5, 0.35], [0.52, 0.72], [0.44, 1.02], [0.2, 1.12], [0, 1.13]],
-    canino: [[0, -2.0], [0.16, -1.7], [0.3, -0.9], [0.4, -0.2], [0.44, 0], [0.52, 0.35], [0.5, 0.75], [0.32, 1.05], [0.1, 1.26], [0, 1.28]],
+    // canino: apenas más largo que el incisivo y con la cúspide redondeada (no un colmillo puntiagudo)
+    canino: [[0, -2.0], [0.16, -1.7], [0.3, -0.9], [0.4, -0.2], [0.44, 0], [0.52, 0.35], [0.52, 0.7], [0.44, 0.92], [0.3, 1.06], [0.15, 1.14], [0, 1.17]],
     premolar: [[0, -1.5], [0.2, -1.3], [0.32, -0.7], [0.4, -0.15], [0.44, 0], [0.54, 0.28], [0.56, 0.6], [0.48, 0.84], [0.24, 0.92], [0, 0.86]],
     molar: [[0, -1.25], [0.3, -1.12], [0.44, -0.6], [0.48, -0.1], [0.5, 0], [0.6, 0.25], [0.62, 0.58], [0.54, 0.82], [0.3, 0.9], [0, 0.82]],
   }[kind].map(([r, y]) => new THREE.Vector2(r, y));
   // corona sola (para el tipodonto): se corta la raíz bajo la encía y se cierra la base
   const pts = crownOnly ? [new THREE.Vector2(0, -0.35), ...profile.filter((p) => p.y >= -0.3)] : profile;
 
-  let geo = new THREE.LatheGeometry(pts, 40);
+  let geo = new THREE.LatheGeometry(pts, 72);
   const pos = geo.attributes.position;
   const v = new THREE.Vector3();
   const [sx, sy, sz] = KIND_SCALE[kind];
@@ -122,7 +123,7 @@ export function detailedMolarGeometry() {
 // ---------- material de esmalte (shader extendido) ----------
 export const shared = { time: { value: 0 }, noise: { value: null } };
 
-export function enamelMaterial({ color = "#f3efe6", pulse = 0, pulseColor = "#c4242a", rim = "#0ea1d2", rimStrength = 0.35, transmission = 0, clearcoat = 0.6 } = {}) {
+export function enamelMaterial({ color = "#f3efe6", pulse = 0, pulseColor = "#c4242a", rim = "#0ea1d2", rimStrength = 0.35, transmission = 0, clearcoat = 0.6, edge = 0 } = {}) {
   const mat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(color), roughness: 0.32, metalness: 0.0, clearcoat, clearcoatRoughness: 0.25,
     sheen: 0.4, sheenColor: new THREE.Color("#ffffff"), transmission, thickness: 0.6, ior: 1.52,
@@ -131,7 +132,7 @@ export function enamelMaterial({ color = "#f3efe6", pulse = 0, pulseColor = "#c4
   mat.userData.uniforms = {
     uTime: shared.time, uNoise: shared.noise,
     uPulse: { value: pulse }, uPulseColor: { value: new THREE.Color(pulseColor) },
-    uRim: { value: new THREE.Color(rim) }, uRimStrength: { value: rimStrength },
+    uRim: { value: new THREE.Color(rim) }, uRimStrength: { value: rimStrength }, uEdge: { value: edge },
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, mat.userData.uniforms);
@@ -141,7 +142,7 @@ export function enamelMaterial({ color = "#f3efe6", pulse = 0, pulseColor = "#c4
       .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWNormal = normalize(mat3(modelMatrix) * objectNormal);");
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>
-        uniform float uTime; uniform sampler2D uNoise; uniform float uPulse; uniform vec3 uPulseColor; uniform vec3 uRim; uniform float uRimStrength;
+        uniform float uTime; uniform sampler2D uNoise; uniform float uPulse; uniform vec3 uPulseColor; uniform vec3 uRim; uniform float uRimStrength; uniform float uEdge;
         varying vec3 vToothPos; varying vec3 vWNormal; varying vec3 vWPos;`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         float enamelNoise = texture(uNoise, vToothPos.xy * 0.55 + vToothPos.zx * 0.35).r;
@@ -151,21 +152,26 @@ export function enamelMaterial({ color = "#f3efe6", pulse = 0, pulseColor = "#c4
         vec3 viewDir = normalize(cameraPosition - vWPos);
         float fres = pow(1.0 - max(dot(viewDir, normalize(vWNormal)), 0.0), 3.0);
         totalEmissiveRadiance += uRim * fres * uRimStrength;              // contorno con el color del tema
+        // silueta oscura en los bordes rasantes: separa cada pieza de la vecina y del fondo
+        float edge = pow(1.0 - max(dot(viewDir, normalize(vWNormal)), 0.0), 2.2);
+        diffuseColor.rgb *= 1.0 - uEdge * edge;
         float beat = 0.5 + 0.5 * sin(uTime * 3.2);
         totalEmissiveRadiance += uPulseColor * uPulse * (0.18 + 0.32 * beat);  // pulso en piezas afectadas`);
   };
-  mat.customProgramCacheKey = () => "enamel-v2";
+  mat.customProgramCacheKey = () => "enamel-v3";
   return mat;
 }
 
 // ---------- escena base ----------
 export function createStage(container, { fov = 35, shadows = true } = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // superresolución: en pantallas 1x se dibuja a 1.5x (bordes más limpios), tope 2x
+  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2));
+  // tono neutro: conserva el contraste del esmalte (ACES aplanaba los blancos)
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = shadows;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;   // r186: PCF ya suaviza con shadow.radius
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -192,7 +198,8 @@ export function createStage(container, { fov = 35, shadows = true } = {}) {
   const key = new THREE.DirectionalLight(0xffffff, 2.4);
   key.position.set(3, 6, 5);
   key.castShadow = shadows;
-  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.radius = 3;
   key.shadow.normalBias = 0.02;
   Object.assign(key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 0.5, far: 20 });
   const rim = new THREE.DirectionalLight(0xffffff, 1.6);

@@ -16,6 +16,16 @@ def _now() -> datetime:
     return now_local()
 
 
+AVATARS_PER_SEX = 15  # app/static/img/avatars/{f,m}01..15.svg (tools/gen_avatars.py)
+
+
+def avatar_art(sex: str, key: int) -> str:
+    """Avatar ilustrado fijo para una persona: misma persona, mismo avatar. 7 es coprimo con 15,
+    así que expedientes consecutivos reciben avatares distintos."""
+    prefix = "m" if sex == "Masculino" else "f"
+    return f"/static/img/avatars/{prefix}{(key * 7) % AVATARS_PER_SEX + 1:02d}.svg"
+
+
 class User(Base):
     """Doctores con acceso al sistema (los únicos usuarios)."""
 
@@ -37,6 +47,14 @@ class User(Base):
     cedula: Mapped[str] = mapped_column(String(20), default="")
     cedula_especialidad: Mapped[str] = mapped_column(String(20), default="")
     universidad: Mapped[str] = mapped_column(String(120), default="")
+
+    @property
+    def avatar_src(self) -> str:
+        """Su foto si subió una; si no, un avatar ilustrado ("Dra." → femenino, "Dr." → masculino)."""
+        if self.photo:
+            return self.photo
+        sex = "Femenino" if self.short_name.lower().startswith("dra") else "Masculino"
+        return avatar_art(sex, (self.id or 0) + 11)
 
     @property
     def initials(self) -> str:
@@ -104,6 +122,10 @@ class Patient(Base):
     @property
     def initials(self) -> str:
         return (self.first_name[:1] + self.last_name[:1]).upper()
+
+    @property
+    def avatar_src(self) -> str:
+        return avatar_art(self.sex, self.id or 0)
 
     @property
     def age(self) -> int | None:

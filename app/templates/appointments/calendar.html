@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const narrow = window.innerWidth < 760;
   const cal = new FullCalendar.Calendar(el, {
     initialView: narrow ? "timeGridDay" : "timeGridWeek",
+    initialDate: new URLSearchParams(location.search).get("fecha") || undefined,
     locale: "es", firstDay: 1, nowIndicator: true, allDaySlot: false,
     slotMinTime: "08:00:00", slotMaxTime: "21:00:00", slotDuration: "00:30:00", height: "auto",
     hiddenDays: [0],
